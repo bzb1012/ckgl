@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.ckgl.mapper.StockMapper">
+
+    <select id="selectStockPage" resultType="com.example.ckgl.dto.StockVO">
+        SELECT s.id,
+               w.id   AS warehouseId,
+               w.name AS warehouseName,
+               l.id   AS locationId,
+               l.code AS locationCode,
+               p.id   AS partId,
+               p.code AS partCode,
+               p.name AS partName,
+               p.unit AS unit,
+               s.quantity,
+               s.updated_at AS updatedAt
+        FROM stock s
+        JOIN location l ON l.id = s.location_id
+        JOIN warehouse w ON w.id = l.warehouse_id
+        JOIN part p ON p.id = s.part_id
+        <where>
+            <if test="q.warehouseId != null">AND l.warehouse_id = #{q.warehouseId}</if>
+            <if test="q.locationId != null">AND s.location_id = #{q.locationId}</if>
+            <if test="q.partId != null">AND s.part_id = #{q.partId}</if>
+            <if test="q.keyword != null and q.keyword != ''">
+                AND (p.code LIKE CONCAT('%', #{q.keyword}, '%')
+                  OR p.name LIKE CONCAT('%', #{q.keyword}, '%')
+                  OR l.code LIKE CONCAT('%', #{q.keyword}, '%'))
+            </if>
+        </where>
+        ORDER BY s.updated_at DESC
+    </select>
+</mapper>

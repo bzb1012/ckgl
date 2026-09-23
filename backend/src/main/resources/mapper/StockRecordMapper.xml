@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.ckgl.mapper.StockRecordMapper">
+
+    <select id="selectRecordPage" resultType="com.example.ckgl.dto.RecordVO">
+        SELECT r.id,
+               r.type,
+               w.name AS warehouseName,
+               l.code AS locationCode,
+               p.code AS partCode,
+               p.name AS partName,
+               r.quantity,
+               r.remark,
+               r.created_at AS createdAt
+        FROM stock_record r
+        JOIN warehouse w ON w.id = r.warehouse_id
+        JOIN location l ON l.id = r.location_id
+        JOIN part p ON p.id = r.part_id
+        <where>
+            <if test="q.type != null and q.type != ''">AND r.type = #{q.type}</if>
+            <if test="q.warehouseId != null">AND r.warehouse_id = #{q.warehouseId}</if>
+            <if test="q.locationId != null">AND r.location_id = #{q.locationId}</if>
+            <if test="q.partId != null">AND r.part_id = #{q.partId}</if>
+            <if test="q.startTime != null and q.startTime != ''">AND r.created_at &gt;= #{q.startTime}</if>
+            <if test="q.endTime != null and q.endTime != ''">AND r.created_at &lt;= #{q.endTime}</if>
+        </where>
+        ORDER BY r.created_at DESC, r.id DESC
+    </select>
+</mapper>

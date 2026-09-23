@@ -1,0 +1,39 @@
+# 1Panel 部署说明：
+#   DB_HOST 两种填法：
+#   A. host.docker.internal（当前值）：适用于 1Panel 的 MySQL 映射了宿主机端口
+#      （应用商店→已安装→MySQL→参数 里看"外部访问端口"）。
+#   B. 直连容器：DB_HOST 填 MySQL 容器名（容器列表里看，形如 1Panel-mysql-xxxx），
+#      并启用下方 networks 段（1Panel 的默认网络名是 1panel-network）。
+services:
+  backend:
+    build: ./backend
+    container_name: ckgl-backend
+    restart: unless-stopped
+    environment:
+      # 按实际情况改这三项：已有 MySQL 的地址/账号/密码
+      DB_HOST: host.docker.internal
+      DB_PORT: 3306
+      DB_NAME: ckgl
+      DB_USER: root
+      DB_PASS: gsbzb1314        # TODO: 改成已有 MySQL 的 root 密码
+      TZ: Asia/Shanghai
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # 方式 A：容器访问宿主机端口（Linux 必须）
+    # 方式 B（二选一，启用时 DB_HOST 填 MySQL 容器名，如 1Panel-mysql-xxxx）：
+    # networks:
+    #   - 1panel-net
+
+  frontend:
+    build: ./frontend
+    container_name: ckgl-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"          # 服务器访问入口，可改成 "8081:80" 等避免端口冲突
+    depends_on:
+      - backend
+
+# 方式 B 才需要（1Panel 默认网络名通常是 1panel-network）：
+# networks:
+#   1panel-net:
+#     external: true
+#     name: 1panel-network

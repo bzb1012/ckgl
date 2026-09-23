@@ -1,0 +1,21 @@
+package com.example.ckgl.entity;
+
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
+import lombok.Data;
+
+import java.time.LocalDateTime;
+
+@Data
+@TableName("stock")
+public class Stock {
+
+    @TableId(type = IdType.AUTO)
+    private Long id;
+    private Long locationId;
+    private Long partId;
+    private Integer quantity;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+}

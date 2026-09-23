@@ -1,0 +1,22 @@
+# IDE / 本地工具
+.trae/
+.idea/
+.vscode/
+*.zip
+
+# Java 后端
+backend/target/
+*.class
+*.log
+
+# 前端
+frontend/node_modules/
+frontend/dist/
+
+# 环境与敏感信息
+.env
+.env.*
+
+# 系统文件
+.DS_Store
+Thumbs.db
