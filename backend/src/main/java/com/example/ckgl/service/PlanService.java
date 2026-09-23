@@ -11,6 +11,7 @@ import com.example.ckgl.dto.PlanDTO;
 import com.example.ckgl.dto.PlanPartVO;
 import com.example.ckgl.dto.PlanVO;
 import com.example.ckgl.dto.ProductPartDetail;
+import com.example.ckgl.dto.TodayPartVO;
 import com.example.ckgl.entity.Part;
 import com.example.ckgl.entity.ProductionPlan;
 import com.example.ckgl.entity.Product;
@@ -148,6 +149,47 @@ public class PlanService extends ServiceImpl<ProductionPlanMapper, ProductionPla
         }
         alerts.sort(Comparator.comparingInt(PlanAlertVO::getLack).reversed());
         return alerts;
+    }
+
+    /**
+     * 今日用料汇总：今天未完成计划的剩余需求，按零件合并、数量累加。
+     * 已完成的计划不再消耗零件，不参与统计（与库存预警口径一致）。
+     */
+    public List<TodayPartVO> todayParts() {
+        List<ProductionPlan> plans = this.list(new LambdaQueryWrapper<ProductionPlan>()
+                .apply("plan_date = CURDATE()")
+                .apply("completed < quantity"));
+        Map<Long, Integer> needMap = new HashMap<>();
+        Map<Long, Integer> planCount = new HashMap<>();
+        for (ProductionPlan plan : plans) {
+            int remaining = plan.getQuantity() - plan.getCompleted();
+            Set<Long> seen = new HashSet<>();
+            for (ProductPartDetail pp : productPartMapper.selectByProductId(plan.getProductId())) {
+                needMap.merge(pp.getPartId(), pp.getQuantity() * remaining, Integer::sum);
+                // 同一计划内同一零件只计一次计划数
+                if (seen.add(pp.getPartId())) {
+                    planCount.merge(pp.getPartId(), 1, Integer::sum);
+                }
+            }
+        }
+        if (needMap.isEmpty()) {
+            return List.of();
+        }
+        Map<Long, Integer> stockMap = aggregateStock();
+        List<TodayPartVO> result = new ArrayList<>();
+        for (Part part : partMapper.selectBatchIds(needMap.keySet())) {
+            TodayPartVO vo = new TodayPartVO();
+            vo.setPartId(part.getId());
+            vo.setPartCode(part.getCode());
+            vo.setPartName(part.getName());
+            vo.setUnit(part.getUnit());
+            vo.setTotalNeed(needMap.get(part.getId()));
+            vo.setPlanCount(planCount.getOrDefault(part.getId(), 0));
+            vo.setStock(stockMap.getOrDefault(part.getId(), 0));
+            result.add(vo);
+        }
+        result.sort(Comparator.comparing(TodayPartVO::getPartCode));
+        return result;
     }
 
     /** 产线选项：固定 1/2/3线 + 数据中已出现的其他产线，按编号排序 */

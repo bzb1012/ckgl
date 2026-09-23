@@ -37,6 +37,7 @@
     <div class="toolbar">
       <el-checkbox v-model="onlyUndone" @change="handleSearch">{{ t('plans.onlyUndone') }}</el-checkbox>
       <div class="spacer"></div>
+      <el-button type="warning" @click="openTodayParts">{{ t('plans.todayParts') }}</el-button>
       <el-button type="success" @click="openCreate">{{ t('plans.add') }}</el-button>
     </div>
 
@@ -87,6 +88,24 @@
 
     <el-pagination class="pager" v-model:current-page="query.page" v-model:page-size="query.size" :total="total"
       :page-sizes="[10, 20, 50]" layout="total, sizes, prev, pager, next" @change="fetch" />
+
+    <!-- 今日用料汇总 -->
+    <el-dialog v-model="todayVisible" :title="t('plans.todayTitle', { date: today })" width="620px">
+      <el-table :data="todayList" v-loading="todayLoading" border size="small">
+        <el-table-column prop="partCode" :label="t('common.partCode')" min-width="110" />
+        <el-table-column v-if="!isMobile" prop="partName" :label="t('common.partName')" min-width="110" />
+        <el-table-column prop="unit" :label="t('common.unit')" width="70" align="center" />
+        <el-table-column prop="totalNeed" :label="t('plans.totalNeed')" width="100" align="center">
+          <template #default="{ row }">
+            <span class="lack">{{ row.totalNeed }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="planCount" :label="t('plans.planCount')" width="90" align="center" />
+        <el-table-column prop="stock" :label="t('plans.stock')" width="90" align="center" />
+      </el-table>
+      <div v-if="!todayLoading && !todayList.length" class="detail-tip">{{ t('plans.todayEmpty') }}</div>
+      <div class="detail-tip">{{ t('plans.todayTip') }}</div>
+    </el-dialog>
 
     <!-- 新增/编辑计划 -->
     <el-dialog v-model="dialogVisible" :title="form.id ? t('plans.editTitle') : t('plans.createTitle')" width="480px">
@@ -227,6 +246,21 @@ const handleLineChange = () => {
 
 const fetchAlerts = async () => {
   alerts.value = await planApi.alerts()
+}
+
+// 今日用料汇总弹窗
+const todayVisible = ref(false)
+const todayLoading = ref(false)
+const todayList = ref([])
+
+const openTodayParts = async () => {
+  todayVisible.value = true
+  todayLoading.value = true
+  try {
+    todayList.value = await planApi.todayParts()
+  } finally {
+    todayLoading.value = false
+  }
 }
 
 const handleSearch = () => {

@@ -82,6 +82,9 @@ const messages = {
       usage: '单件用量', need: '本计划需求', totalDemand: '总需求',
       enough: '足够',
       tip: '状态规则：当前库存 ≥ 总需求 + 安全库存 {safety} 视为足够；总需求为所有未完成计划的需求之和',
+      todayParts: '今日用料', todayTitle: '今日用料汇总 - {date}',
+      totalNeed: '需求总数', todayEmpty: '今日暂无未完成的生产计划',
+      todayTip: '统计今天所有未完成计划的剩余需求（已完成部分不扣料），相同零件已合并、数量累加',
       completedOk: '已更新完成数量', delConfirm: '确定删除该计划吗？'
     }
   },
@@ -156,6 +159,9 @@ const messages = {
       usage: 'Per Unit', need: 'This Plan', totalDemand: 'Total Demand',
       enough: 'OK',
       tip: 'Rule: stock >= total demand + safety stock {safety} is enough; total demand sums all unfinished plans',
+      todayParts: 'Today Parts', todayTitle: "Today's Parts - {date}",
+      totalNeed: 'Total Need', todayEmpty: 'No unfinished plans for today',
+      todayTip: 'Sums remaining demand of all unfinished plans today (completed qty excluded); same parts merged with quantities accumulated',
       completedOk: 'Completed updated', delConfirm: 'Delete this plan?'
     }
   }

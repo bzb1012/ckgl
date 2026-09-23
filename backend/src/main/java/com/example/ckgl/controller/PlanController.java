@@ -6,6 +6,7 @@ import com.example.ckgl.dto.PlanAlertVO;
 import com.example.ckgl.dto.PlanCompletedDTO;
 import com.example.ckgl.dto.PlanDTO;
 import com.example.ckgl.dto.PlanVO;
+import com.example.ckgl.dto.TodayPartVO;
 import com.example.ckgl.entity.ProductionPlan;
 import com.example.ckgl.service.PlanService;
 import jakarta.validation.Valid;
@@ -46,6 +47,12 @@ public class PlanController {
     @GetMapping("/alerts")
     public Result<List<PlanAlertVO>> alerts() {
         return Result.ok(planService.alerts());
+    }
+
+    /** 今日用料汇总：今天未完成计划所需零件，同型号合并、数量累加 */
+    @GetMapping("/today-parts")
+    public Result<List<TodayPartVO>> todayParts() {
+        return Result.ok(planService.todayParts());
     }
 
     @PostMapping
