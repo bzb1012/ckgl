@@ -4,81 +4,81 @@
     <el-alert v-if="alerts.length" type="error" :closable="false" class="alert-banner">
       <template #title>
         <div class="alert-title">
-          <span>库存预警：{{ alerts.length }} 种零件库存不足（需求 + 安全库存 {{ alerts[0].safetyStock || 100 }}），共缺 {{ totalLack }}</span>
-          <el-button link type="primary" @click="showAlerts = !showAlerts">{{ showAlerts ? '收起' : '查看详情' }}</el-button>
+          <span>{{ t('plans.alert', { n: alerts.length, safety: alerts[0].safetyStock || 100, total: totalLack }) }}</span>
+          <el-button link type="primary" @click="showAlerts = !showAlerts">{{ showAlerts ? t('plans.hide') : t('plans.details') }}</el-button>
         </div>
       </template>
     </el-alert>
     <div v-if="showAlerts && alerts.length" class="alert-table">
       <el-table :data="alerts" border size="small">
-        <el-table-column prop="partCode" label="零件型号" min-width="110" />
-        <el-table-column v-if="!isMobile" prop="partName" label="零件名称" min-width="110" />
-        <el-table-column prop="unit" label="单位" width="70" />
-        <el-table-column prop="demand" label="需求总量" width="90" align="center" />
-        <el-table-column prop="safetyStock" label="安全库存" width="90" align="center" />
-        <el-table-column prop="stock" label="当前库存" width="90" align="center" />
-        <el-table-column label="缺口" width="90" align="center">
+        <el-table-column prop="partCode" :label="t('common.partCode')" min-width="110" />
+        <el-table-column v-if="!isMobile" prop="partName" :label="t('common.partName')" min-width="110" />
+        <el-table-column prop="unit" :label="t('common.unit')" width="70" />
+        <el-table-column prop="demand" :label="t('plans.demand')" width="90" align="center" />
+        <el-table-column prop="safetyStock" :label="t('plans.safety')" width="90" align="center" />
+        <el-table-column prop="stock" :label="t('plans.stock')" width="90" align="center" />
+        <el-table-column :label="t('plans.lack')" width="90" align="center">
           <template #default="{ row }">
-            <span class="lack">缺 {{ row.lack }}</span>
+            <span class="lack">{{ t('plans.lackN', { n: row.lack }) }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="planCount" label="涉及计划" width="90" align="center" />
+        <el-table-column prop="planCount" :label="t('plans.planCount')" width="90" align="center" />
       </el-table>
     </div>
 
     <!-- 产线快捷标签 -->
     <div class="line-tabs">
       <el-radio-group v-model="lineTab" @change="handleLineChange">
-        <el-radio-button v-for="l in tabOptions" :key="l" :value="l">{{ l }}</el-radio-button>
+        <el-radio-button v-for="l in tabOptions" :key="l" :value="l">{{ tabLabel(l) }}</el-radio-button>
       </el-radio-group>
-      <span v-if="lineTab !== '全部'" class="line-hint">{{ lineTab }} · 今日（{{ today }}）计划</span>
+      <span v-if="lineTab !== '全部'" class="line-hint">{{ t('plans.lineHint', { line: lineTab, date: today }) }}</span>
     </div>
 
     <div class="toolbar">
-      <el-checkbox v-model="onlyUndone" @change="handleSearch">只看未完成</el-checkbox>
+      <el-checkbox v-model="onlyUndone" @change="handleSearch">{{ t('plans.onlyUndone') }}</el-checkbox>
       <div class="spacer"></div>
-      <el-button type="success" @click="openCreate">新增计划</el-button>
+      <el-button type="success" @click="openCreate">{{ t('plans.add') }}</el-button>
     </div>
 
     <el-table :data="list" v-loading="loading" border stripe :row-class-name="rowClass">
-      <el-table-column prop="planDate" label="计划日期" width="110" />
-      <el-table-column prop="line" label="产线" width="80" align="center" />
-      <el-table-column prop="productCode" label="产品编码" min-width="100" />
-      <el-table-column v-if="!isMobile" prop="productName" label="产品名称" min-width="100" />
-      <el-table-column prop="quantity" label="计划数量" width="90" align="center" />
-      <el-table-column label="已完成数量" width="150" align="center">
+      <el-table-column prop="planDate" :label="t('plans.planDate')" width="110" />
+      <el-table-column prop="line" :label="t('plans.line')" width="80" align="center" />
+      <el-table-column prop="productCode" :label="t('plans.productCode')" min-width="100" />
+      <el-table-column v-if="!isMobile" prop="productName" :label="t('plans.productName')" min-width="100" />
+      <el-table-column prop="quantity" :label="t('plans.planQty')" width="90" align="center" />
+      <el-table-column :label="t('plans.completed')" width="150" align="center">
         <template #default="{ row }">
           <el-input-number :model-value="row.completed" :min="0" :max="row.quantity" size="small"
             @change="val => changeCompleted(row, val)" />
         </template>
       </el-table-column>
-      <el-table-column label="状态" width="90" align="center">
+      <el-table-column :label="t('plans.status')" width="90" align="center">
         <template #default="{ row }">
           <el-tooltip v-if="row.shortages.length" :content="tooltip(row)" placement="top">
-            <el-tag type="danger">缺料</el-tag>
+            <el-tag type="danger">{{ t('plans.tagShort') }}</el-tag>
           </el-tooltip>
-          <el-tag v-else-if="row.completed >= row.quantity" type="success">已完成</el-tag>
-          <el-tag v-else>可生产</el-tag>
+          <el-tag v-else-if="row.completed >= row.quantity" type="success">{{ t('plans.tagDone') }}</el-tag>
+          <el-tag v-else>{{ t('plans.tagReady') }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column v-if="!isMobile" label="缺料明细" min-width="200">
+      <el-table-column v-if="!isMobile" :label="t('plans.shortageDetail')" min-width="200">
         <template #default="{ row }">
           <template v-if="row.shortages.length">
             <div v-for="s in row.shortages" :key="s.partId" class="lack-line">
-              {{ s.partCode }}：需 {{ s.demand }} + 安全 {{ s.safetyStock }}，库存 {{ s.stock }}，缺 {{ s.lack }}
+              {{ t('plans.shortLine', { code: s.partCode, demand: s.demand, safety: s.safetyStock, stock: s.stock, lack: s.lack }) }}
             </div>
           </template>
           <span v-else>—</span>
         </template>
       </el-table-column>
-      <el-table-column v-if="!isMobile" prop="remark" label="备注" min-width="110" show-overflow-tooltip />
-      <el-table-column label="操作" :width="isMobile ? 160 : 180" fixed="right">
+      <el-table-column v-if="!isMobile" prop="remark" :label="t('common.remark')" min-width="110" show-overflow-tooltip />
+      <el-table-column :label="t('common.actions')" :width="isMobile ? 160 : 180" fixed="right">
         <template #default="{ row }">
-          <el-button link type="primary" @click="openDetail(row)">详情</el-button>
-          <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
-          <el-popconfirm title="确定删除该计划吗？" @confirm="handleDelete(row)">
+          <el-button link type="primary" @click="openDetail(row)">{{ t('plans.details') }}</el-button>
+          <el-button link type="primary" @click="openEdit(row)">{{ t('common.edit') }}</el-button>
+          <el-popconfirm :title="t('plans.delConfirm')" @confirm="handleDelete(row)">
             <template #reference>
-              <el-button link type="danger">删除</el-button>
+              <el-button link type="danger">{{ t('common.del') }}</el-button>
             </template>
           </el-popconfirm>
         </template>
@@ -89,31 +89,31 @@
       :page-sizes="[10, 20, 50]" layout="total, sizes, prev, pager, next" @change="fetch" />
 
     <!-- 新增/编辑计划 -->
-    <el-dialog v-model="dialogVisible" :title="form.id ? '编辑计划' : '新增生产计划'" width="480px">
+    <el-dialog v-model="dialogVisible" :title="form.id ? t('plans.editTitle') : t('plans.createTitle')" width="480px">
       <el-form ref="formRef" :model="form" :rules="rules" label-width="90px">
-        <el-form-item label="计划日期" prop="planDate">
+        <el-form-item :label="t('plans.planDate')" prop="planDate">
           <el-date-picker v-model="form.planDate" type="date" value-format="YYYY-MM-DD" style="width: 100%" />
         </el-form-item>
-        <el-form-item label="产线" prop="line">
-          <el-select v-model="form.line" filterable allow-create default-first-option placeholder="选择或输入产线，如 1线" style="width: 100%">
+        <el-form-item :label="t('plans.line')" prop="line">
+          <el-select v-model="form.line" filterable allow-create default-first-option :placeholder="t('plans.linePh')" style="width: 100%">
             <el-option v-for="l in lineOptions" :key="l" :label="l" :value="l" />
           </el-select>
         </el-form-item>
-        <el-form-item label="产品" prop="productId">
-          <el-select v-model="form.productId" filterable placeholder="选择产品" style="width: 100%">
+        <el-form-item :label="t('plans.product')" prop="productId">
+          <el-select v-model="form.productId" filterable :placeholder="t('plans.productPh')" style="width: 100%">
             <el-option v-for="p in products" :key="p.id" :label="`${p.code} / ${p.name}`" :value="p.id" />
           </el-select>
         </el-form-item>
-        <el-form-item label="计划数量" prop="quantity">
+        <el-form-item :label="t('plans.planQty')" prop="quantity">
           <el-input-number v-model="form.quantity" :min="1" style="width: 100%" />
         </el-form-item>
-        <el-form-item label="备注">
+        <el-form-item :label="t('common.remark')">
           <el-input v-model="form.remark" type="textarea" :rows="2" />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="saving" @click="handleSave">保存</el-button>
+        <el-button @click="dialogVisible = false">{{ t('common.cancel') }}</el-button>
+        <el-button type="primary" :loading="saving" @click="handleSave">{{ t('common.save') }}</el-button>
       </template>
     </el-dialog>
 
@@ -124,25 +124,25 @@
           <el-tag>{{ detailPlan.line }}</el-tag>
           <span>{{ detailPlan.planDate }}</span>
           <span>{{ detailPlan.productCode }} / {{ detailPlan.productName }}</span>
-          <span>计划 {{ detailPlan.quantity }} · 已完成 {{ detailPlan.completed }} · 剩余 {{ detailPlan.quantity - detailPlan.completed }}</span>
+          <span>{{ t('plans.metaLine', { qty: detailPlan.quantity, done: detailPlan.completed, left: detailPlan.quantity - detailPlan.completed }) }}</span>
         </div>
         <el-table :data="detailPlan.parts" border size="small">
-          <el-table-column prop="partCode" label="零件型号" min-width="100" />
-          <el-table-column v-if="!isMobile" prop="partName" label="零件名称" min-width="100" />
-          <el-table-column prop="unit" label="单位" width="60" align="center" />
-          <el-table-column prop="usage" label="单件用量" width="80" align="center" />
-          <el-table-column prop="need" label="本计划需求" width="95" align="center" />
-          <el-table-column prop="demand" label="总需求" width="75" align="center" />
-          <el-table-column prop="stock" label="当前库存" width="80" align="center" />
-          <el-table-column label="状态" width="90" align="center">
+          <el-table-column prop="partCode" :label="t('common.partCode')" min-width="100" />
+          <el-table-column v-if="!isMobile" prop="partName" :label="t('common.partName')" min-width="100" />
+          <el-table-column prop="unit" :label="t('common.unit')" width="60" align="center" />
+          <el-table-column prop="usage" :label="t('plans.usage')" width="80" align="center" />
+          <el-table-column prop="need" :label="t('plans.need')" width="95" align="center" />
+          <el-table-column prop="demand" :label="t('plans.totalDemand')" width="75" align="center" />
+          <el-table-column prop="stock" :label="t('plans.stock')" width="80" align="center" />
+          <el-table-column :label="t('plans.status')" width="90" align="center">
             <template #default="{ row }">
-              <el-tag v-if="row.enough" type="success">足够</el-tag>
-              <el-tag v-else type="danger">缺 {{ row.lack }}</el-tag>
+              <el-tag v-if="row.enough" type="success">{{ t('plans.enough') }}</el-tag>
+              <el-tag v-else type="danger">{{ t('plans.lackN', { n: row.lack }) }}</el-tag>
             </template>
           </el-table-column>
         </el-table>
         <div class="detail-tip">
-          状态规则：当前库存 ≥ 总需求 + 安全库存 {{ detailPlan.parts[0]?.safetyStock || 100 }} 视为足够；总需求为所有未完成计划的需求之和
+          {{ t('plans.tip', { safety: detailPlan.parts[0]?.safetyStock || 100 }) }}
         </div>
       </template>
     </el-dialog>
@@ -155,7 +155,9 @@ import { ElMessage } from 'element-plus'
 import planApi from '../api/plan'
 import productApi from '../api/product'
 import { useResponsive } from '../composables/useResponsive'
+import { useI18n } from '../i18n'
 
+const { t } = useI18n()
 const { isMobile } = useResponsive()
 
 const loading = ref(false)
@@ -165,10 +167,11 @@ const total = ref(0)
 const query = reactive({ page: 1, size: 10 })
 const onlyUndone = ref(false)
 
-// 产线快捷标签：全部 / 1线 / 2线 / 3线...
+// 产线快捷标签：全部 / 1线 / 2线 / 3线...（"全部"为内部哨兵值，展示文案走 i18n）
 const lineTab = ref('全部')
 const lineOptions = ref(['1线', '2线', '3线'])
 const tabOptions = computed(() => ['全部', ...lineOptions.value])
+const tabLabel = l => (l === '全部' ? t('plans.all') : l)
 const today = new Date().toISOString().slice(0, 10)
 
 const alerts = ref([])
@@ -180,17 +183,19 @@ const products = ref([])
 // 计划零件库存详情弹窗
 const detailVisible = ref(false)
 const detailPlan = ref(null)
-const detailTitle = computed(() => (detailPlan.value ? `零件库存详情 - ${detailPlan.value.line} ${detailPlan.value.productCode}` : ''))
+const detailTitle = computed(() =>
+  detailPlan.value ? t('plans.detailTitle', { line: detailPlan.value.line, code: detailPlan.value.productCode }) : ''
+)
 
 const dialogVisible = ref(false)
 const formRef = ref()
 const form = reactive({ id: null, planDate: '', line: '1线', productId: null, quantity: 1, remark: '' })
-const rules = {
-  planDate: [{ required: true, message: '请选择计划日期', trigger: 'change' }],
-  line: [{ required: true, message: '请选择产线', trigger: 'change' }],
-  productId: [{ required: true, message: '请选择产品', trigger: 'change' }],
-  quantity: [{ required: true, message: '请输入计划数量', trigger: 'blur' }]
-}
+const rules = computed(() => ({
+  planDate: [{ required: true, message: t('plans.dateRequired'), trigger: 'change' }],
+  line: [{ required: true, message: t('plans.lineRequired'), trigger: 'change' }],
+  productId: [{ required: true, message: t('plans.productRequired'), trigger: 'change' }],
+  quantity: [{ required: true, message: t('plans.qtyRequired'), trigger: 'blur' }]
+}))
 
 const defaultDate = () => {
   const d = new Date(Date.now() + 86400000)
@@ -233,13 +238,13 @@ const handleSearch = () => {
 /** 缺料行醒目高亮 */
 const rowClass = ({ row }) => (row.shortages.length ? 'warn-row' : '')
 
-const tooltip = row => row.shortages.map(s => `${s.partCode} 缺 ${s.lack}`).join('；')
+const tooltip = row => row.shortages.map(s => `${s.partCode} ${t('plans.lackN', { n: s.lack })}`).join(', ')
 
 const changeCompleted = async (row, val) => {
   if (val == null) return
   await planApi.updateCompleted(row.id, val)
   row.completed = val
-  ElMessage.success('已更新完成数量')
+  ElMessage.success(t('plans.completedOk'))
   fetchAlerts()
   // 已完成数量变化可能影响状态与其他计划的预警判断
   fetch()
@@ -278,7 +283,7 @@ const handleSave = async () => {
     } else {
       await planApi.create(payload)
     }
-    ElMessage.success('保存成功')
+    ElMessage.success(t('common.saveOk'))
     dialogVisible.value = false
     fetch()
     fetchAlerts()
@@ -290,7 +295,7 @@ const handleSave = async () => {
 
 const handleDelete = async row => {
   await planApi.remove(row.id)
-  ElMessage.success('删除成功')
+  ElMessage.success(t('common.deleteOk'))
   fetch()
   fetchAlerts()
 }

@@ -1,29 +1,29 @@
 <template>
   <el-card>
     <div class="toolbar filters">
-      <el-select v-model="query.warehouseId" clearable placeholder="全部仓库" style="width: 160px" @change="onWarehouseChange">
+      <el-select v-model="query.warehouseId" clearable :placeholder="t('stocks.allWarehouses')" style="width: 160px" @change="onWarehouseChange">
         <el-option v-for="w in warehouses" :key="w.id" :label="w.name" :value="w.id" />
       </el-select>
-      <el-select v-model="query.locationId" clearable placeholder="全部货位" :disabled="!query.warehouseId" style="width: 150px" @change="fetch">
+      <el-select v-model="query.locationId" clearable :placeholder="t('stocks.allLocations')" :disabled="!query.warehouseId" style="width: 150px" @change="fetch">
         <el-option v-for="l in locations" :key="l.id" :label="l.code" :value="l.id" />
       </el-select>
-      <el-input v-model="query.keyword" placeholder="零件型号/名称/货位编号" clearable style="width: 220px" @keyup.enter="handleSearch" @clear="handleSearch" />
-      <el-button type="primary" @click="handleSearch">查询</el-button>
-      <el-button @click="resetQuery">重置</el-button>
+      <el-input v-model="query.keyword" :placeholder="t('stocks.searchPh')" clearable style="width: 220px" @keyup.enter="handleSearch" @clear="handleSearch" />
+      <el-button type="primary" @click="handleSearch">{{ t('common.search') }}</el-button>
+      <el-button @click="resetQuery">{{ t('common.reset') }}</el-button>
     </div>
 
     <el-table :data="list" v-loading="loading" border stripe>
-      <el-table-column v-if="!isMobile" prop="warehouseName" label="仓库" min-width="120" />
-      <el-table-column prop="locationCode" label="货位编号" min-width="110" />
-      <el-table-column prop="partCode" label="零件型号" min-width="130" />
-      <el-table-column v-if="!isMobile" prop="partName" label="零件名称" min-width="130" />
-      <el-table-column v-if="!isMobile" prop="unit" label="单位" width="80" />
-      <el-table-column prop="quantity" label="库存数量" width="100">
+      <el-table-column v-if="!isMobile" prop="warehouseName" :label="t('common.warehouse')" min-width="120" />
+      <el-table-column prop="locationCode" :label="t('stocks.locationCode')" min-width="110" />
+      <el-table-column prop="partCode" :label="t('common.partCode')" min-width="130" />
+      <el-table-column v-if="!isMobile" prop="partName" :label="t('common.partName')" min-width="130" />
+      <el-table-column v-if="!isMobile" prop="unit" :label="t('common.unit')" width="80" />
+      <el-table-column prop="quantity" :label="t('stocks.stockQty')" width="100">
         <template #default="{ row }">
           <span :style="{ color: row.quantity > 0 ? '#303133' : '#909399' }">{{ row.quantity }}</span>
         </template>
       </el-table-column>
-      <el-table-column v-if="!isMobile" prop="updatedAt" label="更新时间" width="180" :formatter="fmtTime" />
+      <el-table-column v-if="!isMobile" prop="updatedAt" :label="t('stocks.updatedAt')" width="180" :formatter="fmtTime" />
     </el-table>
 
     <el-pagination class="pager" v-model:current-page="query.page" v-model:page-size="query.size" :total="total"
@@ -37,7 +37,9 @@ import warehouseApi from '../api/warehouse'
 import stockApi from '../api/stock'
 import { fmtTime } from '../utils/format'
 import { useResponsive } from '../composables/useResponsive'
+import { useI18n } from '../i18n'
 
+const { t } = useI18n()
 const { isMobile } = useResponsive()
 
 const loading = ref(false)

@@ -1,25 +1,25 @@
 <template>
   <el-card>
     <div class="toolbar">
-      <el-input v-model="query.keyword" placeholder="按编码/名称搜索" clearable style="width: 240px" @keyup.enter="handleSearch" @clear="handleSearch" />
-      <el-button type="primary" @click="handleSearch">查询</el-button>
+      <el-input v-model="query.keyword" :placeholder="t('products.searchPh')" clearable style="width: 240px" @keyup.enter="handleSearch" @clear="handleSearch" />
+      <el-button type="primary" @click="handleSearch">{{ t('common.search') }}</el-button>
       <div class="spacer"></div>
-      <el-button type="success" @click="openCreate">新增产品</el-button>
+      <el-button type="success" @click="openCreate">{{ t('products.add') }}</el-button>
     </div>
 
     <el-table :data="list" v-loading="loading" border stripe>
-      <el-table-column prop="code" label="产品编码" min-width="130" />
-      <el-table-column prop="name" label="产品名称" min-width="140" />
-      <el-table-column prop="partCount" label="零件数" width="90" />
-      <el-table-column v-if="!isMobile" prop="remark" label="备注" min-width="150" show-overflow-tooltip />
-      <el-table-column v-if="!isMobile" prop="createdAt" label="创建时间" width="180" :formatter="fmtTime" />
-      <el-table-column label="操作" width="200" fixed="right">
+      <el-table-column prop="code" :label="t('products.code')" min-width="130" />
+      <el-table-column prop="name" :label="t('products.name')" min-width="140" />
+      <el-table-column prop="partCount" :label="t('products.partCount')" width="90" />
+      <el-table-column v-if="!isMobile" prop="remark" :label="t('common.remark')" min-width="150" show-overflow-tooltip />
+      <el-table-column v-if="!isMobile" prop="createdAt" :label="t('common.createdAt')" width="180" :formatter="fmtTime" />
+      <el-table-column :label="t('common.actions')" width="200" fixed="right">
         <template #default="{ row }">
-          <el-button link type="primary" @click="openViewParts(row)">查看零件</el-button>
-          <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
-          <el-popconfirm title="确定删除该产品吗？" @confirm="handleDelete(row)">
+          <el-button link type="primary" @click="openViewParts(row)">{{ t('products.viewParts') }}</el-button>
+          <el-button link type="primary" @click="openEdit(row)">{{ t('common.edit') }}</el-button>
+          <el-popconfirm :title="t('products.delConfirm')" @confirm="handleDelete(row)">
             <template #reference>
-              <el-button link type="danger">删除</el-button>
+              <el-button link type="danger">{{ t('common.del') }}</el-button>
             </template>
           </el-popconfirm>
         </template>
@@ -30,33 +30,33 @@
       :page-sizes="[10, 20, 50]" layout="total, sizes, prev, pager, next" @change="fetch" />
 
     <!-- 新增/编辑产品 -->
-    <el-dialog v-model="dialogVisible" :title="form.id ? '编辑产品' : '新增产品'" width="760px" top="6vh">
+    <el-dialog v-model="dialogVisible" :title="form.id ? t('products.editTitle') : t('products.createTitle')" width="760px" top="6vh">
       <el-form ref="formRef" :model="form" :rules="rules" label-width="90px">
-        <el-form-item label="产品编码" prop="code">
-          <el-input v-model="form.code" placeholder="如 PRD-001" />
+        <el-form-item :label="t('products.code')" prop="code">
+          <el-input v-model="form.code" :placeholder="t('products.codePh')" />
         </el-form-item>
-        <el-form-item label="产品名称" prop="name">
+        <el-form-item :label="t('products.name')" prop="name">
           <el-input v-model="form.name" />
         </el-form-item>
-        <el-form-item label="备注">
+        <el-form-item :label="t('common.remark')">
           <el-input v-model="form.remark" type="textarea" :rows="2" />
         </el-form-item>
-        <el-form-item label="绑定零件">
+        <el-form-item :label="t('products.bindParts')">
           <div style="width: 100%">
-            <el-button type="primary" plain size="small" @click="openPartPicker">添加零件</el-button>
-            <el-table :data="form.parts" border size="small" style="margin-top: 8px" empty-text="暂未绑定零件，点击“添加零件”选择">
-              <el-table-column prop="partCode" label="零件型号" min-width="130" />
-              <el-table-column v-if="!isMobile" prop="partName" label="零件名称" min-width="130" />
-              <el-table-column v-if="!isMobile" prop="category" label="分类" width="100" />
-              <el-table-column v-if="!isMobile" prop="unit" label="单位" width="80" />
-              <el-table-column label="使用数量" width="170">
+            <el-button type="primary" plain size="small" @click="openPartPicker">{{ t('products.addPart') }}</el-button>
+            <el-table :data="form.parts" border size="small" style="margin-top: 8px" :empty-text="t('products.emptyParts')">
+              <el-table-column prop="partCode" :label="t('common.partCode')" min-width="130" />
+              <el-table-column v-if="!isMobile" prop="partName" :label="t('common.partName')" min-width="130" />
+              <el-table-column v-if="!isMobile" prop="category" :label="t('common.category')" width="100" />
+              <el-table-column v-if="!isMobile" prop="unit" :label="t('common.unit')" width="80" />
+              <el-table-column :label="t('products.usage')" width="170">
                 <template #default="{ row }">
                   <el-input-number v-model="row.quantity" :min="1" size="small" />
                 </template>
               </el-table-column>
-              <el-table-column label="操作" width="80">
+              <el-table-column :label="t('common.actions')" width="80">
                 <template #default="{ $index }">
-                  <el-button link type="danger" size="small" @click="form.parts.splice($index, 1)">移除</el-button>
+                  <el-button link type="danger" size="small" @click="form.parts.splice($index, 1)">{{ t('products.remove') }}</el-button>
                 </template>
               </el-table-column>
             </el-table>
@@ -64,59 +64,61 @@
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="saving" @click="handleSave">保存</el-button>
+        <el-button @click="dialogVisible = false">{{ t('common.cancel') }}</el-button>
+        <el-button type="primary" :loading="saving" @click="handleSave">{{ t('common.save') }}</el-button>
       </template>
     </el-dialog>
 
     <!-- 选择零件 -->
-    <el-dialog v-model="pickerVisible" title="选择零件" width="640px" append-to-body>
+    <el-dialog v-model="pickerVisible" :title="t('products.pickerTitle')" width="640px" append-to-body>
       <div class="toolbar">
-        <el-select v-model="pickerQuery.category" placeholder="全部分类" clearable filterable style="width: 130px" @change="handlePickerFilter">
+        <el-select v-model="pickerQuery.category" :placeholder="t('parts.allCategories')" clearable filterable style="width: 130px" @change="handlePickerFilter">
           <el-option v-for="c in partCategories" :key="c" :label="c" :value="c" />
         </el-select>
-        <el-input v-model="pickerQuery.keyword" placeholder="按型号/名称搜索" clearable style="width: 200px" @keyup.enter="handlePickerFilter" @clear="handlePickerFilter" />
-        <el-button type="primary" @click="handlePickerFilter">查询</el-button>
+        <el-input v-model="pickerQuery.keyword" :placeholder="t('parts.searchPh')" clearable style="width: 200px" @keyup.enter="handlePickerFilter" @clear="handlePickerFilter" />
+        <el-button type="primary" @click="handlePickerFilter">{{ t('common.search') }}</el-button>
       </div>
       <el-table :data="partList" border size="small" v-loading="pickerLoading" @selection-change="selection = $event">
         <el-table-column type="selection" width="45" />
-        <el-table-column prop="code" label="零件型号" min-width="130" />
-        <el-table-column prop="name" label="零件名称" min-width="130" />
-        <el-table-column prop="category" label="分类" width="100" />
-        <el-table-column prop="unit" label="单位" width="80" />
+        <el-table-column prop="code" :label="t('common.partCode')" min-width="130" />
+        <el-table-column prop="name" :label="t('common.partName')" min-width="130" />
+        <el-table-column prop="category" :label="t('common.category')" width="100" />
+        <el-table-column prop="unit" :label="t('common.unit')" width="80" />
       </el-table>
       <el-pagination class="pager" v-model:current-page="pickerQuery.page" :page-size="pickerQuery.size"
         :total="partTotal" layout="total, prev, pager, next" @change="fetchParts" />
       <template #footer>
-        <el-button @click="pickerVisible = false">取消</el-button>
-        <el-button type="primary" @click="confirmPick">确定</el-button>
+        <el-button @click="pickerVisible = false">{{ t('common.cancel') }}</el-button>
+        <el-button type="primary" @click="confirmPick">{{ t('common.confirm') }}</el-button>
       </template>
     </el-dialog>
 
     <!-- 查看零件清单 -->
-    <el-dialog v-model="viewVisible" :title="`零件清单 - ${viewProduct?.name || ''}`" width="560px">
-      <el-table :data="viewParts" border size="small" v-loading="viewLoading" empty-text="该产品暂未绑定零件">
-        <el-table-column prop="partCode" label="零件型号" min-width="130" />
-        <el-table-column v-if="!isMobile" prop="partName" label="零件名称" min-width="130" />
-        <el-table-column v-if="!isMobile" prop="category" label="分类" width="100" />
-        <el-table-column v-if="!isMobile" prop="unit" label="单位" width="80" />
-        <el-table-column prop="quantity" label="使用数量" width="100" />
+    <el-dialog v-model="viewVisible" :title="t('products.partsTitle', { name: viewProduct?.name || '' })" width="560px">
+      <el-table :data="viewParts" border size="small" v-loading="viewLoading" :empty-text="t('products.partsEmpty')">
+        <el-table-column prop="partCode" :label="t('common.partCode')" min-width="130" />
+        <el-table-column v-if="!isMobile" prop="partName" :label="t('common.partName')" min-width="130" />
+        <el-table-column v-if="!isMobile" prop="category" :label="t('common.category')" width="100" />
+        <el-table-column v-if="!isMobile" prop="unit" :label="t('common.unit')" width="80" />
+        <el-table-column prop="quantity" :label="t('products.usage')" width="100" />
       </el-table>
       <template #footer>
-        <el-button @click="viewVisible = false">关闭</el-button>
+        <el-button @click="viewVisible = false">{{ t('common.close') }}</el-button>
       </template>
     </el-dialog>
   </el-card>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import productApi from '../api/product'
 import partApi from '../api/part'
 import { fmtTime } from '../utils/format'
 import { useResponsive } from '../composables/useResponsive'
+import { useI18n } from '../i18n'
 
+const { t } = useI18n()
 const { isMobile } = useResponsive()
 
 const loading = ref(false)
@@ -128,10 +130,10 @@ const query = reactive({ keyword: '', page: 1, size: 10 })
 const dialogVisible = ref(false)
 const formRef = ref()
 const form = reactive({ id: null, code: '', name: '', remark: '', parts: [] })
-const rules = {
-  code: [{ required: true, message: '请输入产品编码', trigger: 'blur' }],
-  name: [{ required: true, message: '请输入产品名称', trigger: 'blur' }]
-}
+const rules = computed(() => ({
+  code: [{ required: true, message: t('products.codeRequired'), trigger: 'blur' }],
+  name: [{ required: true, message: t('products.nameRequired'), trigger: 'blur' }]
+}))
 
 const pickerVisible = ref(false)
 const pickerLoading = ref(false)
@@ -210,7 +212,7 @@ const openPartPicker = async () => {
 /** 将勾选零件合并进已绑列表（按 partId 去重，默认数量 1） */
 const confirmPick = () => {
   if (!selection.value.length) {
-    ElMessage.warning('请先勾选零件')
+    ElMessage.warning(t('products.pickFirst'))
     return
   }
   for (const p of selection.value) {
@@ -255,7 +257,7 @@ const handleSave = async () => {
     } else {
       await productApi.create(payload)
     }
-    ElMessage.success('保存成功')
+    ElMessage.success(t('common.saveOk'))
     dialogVisible.value = false
     fetch()
   } finally {
@@ -265,7 +267,7 @@ const handleSave = async () => {
 
 const handleDelete = async row => {
   await productApi.remove(row.id)
-  ElMessage.success('删除成功')
+  ElMessage.success(t('common.deleteOk'))
   fetch()
 }
 

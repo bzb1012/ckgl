@@ -1,57 +1,83 @@
 <template>
-  <el-container class="layout">
-    <el-aside width="200px" class="aside pc-only">
-      <div class="logo">仓库管理系统</div>
-      <el-menu router :default-active="$route.path" class="menu" background-color="#001529" text-color="#bfcbd9" active-text-color="#409EFF">
-        <el-menu-item index="/records">出入库</el-menu-item>
-        <el-menu-item index="/stocks">库存查询</el-menu-item>
-        <el-menu-item index="/plans">生产计划</el-menu-item>
-        <template v-if="isAdminArea">
-          <el-menu-item index="/admin/parts">零件管理</el-menu-item>
-          <el-menu-item index="/admin/products">产品管理</el-menu-item>
-          <el-menu-item index="/admin/warehouses">仓库管理</el-menu-item>
-        </template>
-      </el-menu>
-    </el-aside>
-    <el-container class="body-col">
-      <header class="m-header mobile-only">
-        <span class="title">仓库管理系统</span>
-        <button class="burger" @click="menuOpen = true" aria-label="打开菜单">
-          <span></span><span></span><span></span>
-        </button>
-      </header>
-      <el-main class="main">
-        <router-view />
-      </el-main>
-    </el-container>
-    <el-drawer v-model="menuOpen" direction="ltr" size="220px" :with-header="false" class="mobile-menu-drawer">
-      <div class="drawer-inner">
-        <div class="drawer-logo">仓库管理系统</div>
+  <el-config-provider :locale="elLocale">
+    <el-container class="layout">
+      <el-aside width="200px" class="aside pc-only">
+        <div class="logo">{{ t('app.title') }}</div>
         <el-menu router :default-active="$route.path" class="menu" background-color="#001529" text-color="#bfcbd9" active-text-color="#409EFF">
-          <el-menu-item index="/records">出入库</el-menu-item>
-          <el-menu-item index="/stocks">库存查询</el-menu-item>
-          <el-menu-item index="/plans">生产计划</el-menu-item>
+          <el-menu-item :index="p('/records')">{{ t('menu.records') }}</el-menu-item>
+          <el-menu-item :index="p('/stocks')">{{ t('menu.stocks') }}</el-menu-item>
+          <el-menu-item :index="p('/plans')">{{ t('menu.plans') }}</el-menu-item>
           <template v-if="isAdminArea">
-            <el-menu-item index="/admin/parts">零件管理</el-menu-item>
-            <el-menu-item index="/admin/products">产品管理</el-menu-item>
-            <el-menu-item index="/admin/warehouses">仓库管理</el-menu-item>
+            <el-menu-item :index="p('/admin/parts')">{{ t('menu.parts') }}</el-menu-item>
+            <el-menu-item :index="p('/admin/products')">{{ t('menu.products') }}</el-menu-item>
+            <el-menu-item :index="p('/admin/warehouses')">{{ t('menu.warehouses') }}</el-menu-item>
           </template>
         </el-menu>
-      </div>
-    </el-drawer>
-  </el-container>
+        <div class="lang-switch">
+          <el-button link @click="toggleLang">{{ isEn ? '中文' : 'English' }}</el-button>
+        </div>
+      </el-aside>
+      <el-container class="body-col">
+        <header class="m-header mobile-only">
+          <span class="title">{{ t('app.title') }}</span>
+          <div class="m-header-right">
+            <button class="lang-btn" @click="toggleLang">{{ isEn ? '中' : 'EN' }}</button>
+            <button class="burger" @click="menuOpen = true" aria-label="Menu">
+              <span></span><span></span><span></span>
+            </button>
+          </div>
+        </header>
+        <el-main class="main">
+          <router-view />
+        </el-main>
+      </el-container>
+      <el-drawer v-model="menuOpen" direction="ltr" size="220px" :with-header="false" class="mobile-menu-drawer">
+        <div class="drawer-inner">
+          <div class="drawer-logo">{{ t('app.title') }}</div>
+          <el-menu router :default-active="$route.path" class="menu" background-color="#001529" text-color="#bfcbd9" active-text-color="#409EFF">
+            <el-menu-item :index="p('/records')">{{ t('menu.records') }}</el-menu-item>
+            <el-menu-item :index="p('/stocks')">{{ t('menu.stocks') }}</el-menu-item>
+            <el-menu-item :index="p('/plans')">{{ t('menu.plans') }}</el-menu-item>
+            <template v-if="isAdminArea">
+              <el-menu-item :index="p('/admin/parts')">{{ t('menu.parts') }}</el-menu-item>
+              <el-menu-item :index="p('/admin/products')">{{ t('menu.products') }}</el-menu-item>
+              <el-menu-item :index="p('/admin/warehouses')">{{ t('menu.warehouses') }}</el-menu-item>
+            </template>
+          </el-menu>
+          <div class="lang-switch">
+            <el-button link @click="toggleLang">{{ isEn ? '中文' : 'English' }}</el-button>
+          </div>
+        </div>
+      </el-drawer>
+    </el-container>
+  </el-config-provider>
 </template>
 
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import zhCn from 'element-plus/es/locale/lang/zh-cn'
+import en from 'element-plus/es/locale/lang/en'
 import { useResponsive } from './composables/useResponsive'
+import { useI18n } from './i18n'
 
 useResponsive()
 const route = useRoute()
+const router = useRouter()
+const { t, locale } = useI18n()
+const isEn = computed(() => locale.value === 'en')
+// Element Plus 内置文案（分页/日期/空数据等）跟随语言
+const elLocale = computed(() => (isEn.value ? en : zhCn))
 const menuOpen = ref(false)
-// 管理区菜单项仅在 /admin 路径下显示，主页不可见
-const isAdminArea = computed(() => route.path.startsWith('/admin'))
+// 英文模式下菜单/跳转路径加 /en 前缀
+const p = path => (isEn.value ? '/en' + path : path)
+// 管理区菜单项仅在 /admin 路径下显示（兼容 /en/admin），主页不可见
+const isAdminArea = computed(() => route.path.replace(/^\/en/, '').startsWith('/admin'))
+// 中英文切换：保持当前页面，仅切换 /en 前缀
+const toggleLang = () => {
+  const target = isEn.value ? route.path.replace(/^\/en/, '') || '/' : '/en' + route.path
+  router.replace(target)
+}
 // 切换页面后自动收起移动端菜单抽屉
 watch(() => route.path, () => { menuOpen.value = false })
 </script>
@@ -85,6 +111,9 @@ body,
 }
 .menu {
   border-right: none;
+}
+.lang-switch {
+  padding: 12px 20px;
 }
 .main {
   background-color: #f0f2f5;
@@ -139,6 +168,21 @@ html.is-mobile .body-col {
 .m-header .title {
   font-size: 16px;
   font-weight: 600;
+}
+.m-header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.lang-btn {
+  height: 26px;
+  padding: 0 8px;
+  font-size: 12px;
+  color: #fff;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 4px;
+  cursor: pointer;
 }
 .burger {
   width: 36px;
