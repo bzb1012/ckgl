@@ -89,8 +89,13 @@
     <el-pagination class="pager" v-model:current-page="query.page" v-model:page-size="query.size" :total="total"
       :page-sizes="[10, 20, 50]" layout="total, sizes, prev, pager, next" @change="fetch" />
 
-    <!-- 今日用料汇总 -->
-    <el-dialog v-model="todayVisible" :title="t('plans.todayTitle', { date: today })" width="620px">
+    <!-- 用料汇总（可选日期） -->
+    <el-dialog v-model="todayVisible" :title="t('plans.todayTitle', { date: todayDate })" width="620px">
+      <div class="today-picker">
+        <span>{{ t('plans.planDate') }}</span>
+        <el-date-picker v-model="todayDate" type="date" value-format="YYYY-MM-DD" :clearable="false"
+          style="width: 160px" />
+      </div>
       <el-table :data="todayList" v-loading="todayLoading" border size="small">
         <el-table-column prop="partCode" :label="t('common.partCode')" min-width="110" />
         <el-table-column v-if="!isMobile" prop="partName" :label="t('common.partName')" min-width="110" />
@@ -169,7 +174,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import planApi from '../api/plan'
 import productApi from '../api/product'
@@ -248,20 +253,31 @@ const fetchAlerts = async () => {
   alerts.value = await planApi.alerts()
 }
 
-// 今日用料汇总弹窗
+// 用料汇总弹窗（默认今天，可切换日期）
 const todayVisible = ref(false)
 const todayLoading = ref(false)
 const todayList = ref([])
+const todayDate = ref(today)
 
-const openTodayParts = async () => {
-  todayVisible.value = true
+const fetchTodayParts = async () => {
   todayLoading.value = true
   try {
-    todayList.value = await planApi.todayParts()
+    todayList.value = await planApi.todayParts(todayDate.value)
   } finally {
     todayLoading.value = false
   }
 }
+
+const openTodayParts = () => {
+  todayDate.value = today
+  todayVisible.value = true
+  fetchTodayParts()
+}
+
+// 日期变化自动重新查询（面板点选与手动输入均生效）
+watch(todayDate, () => {
+  if (todayVisible.value) fetchTodayParts()
+})
 
 const handleSearch = () => {
   query.page = 1
@@ -361,6 +377,13 @@ onMounted(() => {
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+.today-picker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   margin-bottom: 12px;
   font-size: 13px;
 }

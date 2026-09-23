@@ -24,6 +24,7 @@ import com.example.ckgl.mapper.StockMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -152,12 +153,12 @@ public class PlanService extends ServiceImpl<ProductionPlanMapper, ProductionPla
     }
 
     /**
-     * 今日用料汇总：今天未完成计划的剩余需求，按零件合并、数量累加。
+     * 指定日期的用料汇总：该日期未完成计划的剩余需求，按零件合并、数量累加。
      * 已完成的计划不再消耗零件，不参与统计（与库存预警口径一致）。
      */
-    public List<TodayPartVO> todayParts() {
+    public List<TodayPartVO> todayParts(LocalDate date) {
         List<ProductionPlan> plans = this.list(new LambdaQueryWrapper<ProductionPlan>()
-                .apply("plan_date = CURDATE()")
+                .apply("plan_date = {0}", date)
                 .apply("completed < quantity"));
         Map<Long, Integer> needMap = new HashMap<>();
         Map<Long, Integer> planCount = new HashMap<>();

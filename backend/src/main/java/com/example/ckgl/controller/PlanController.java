@@ -11,6 +11,7 @@ import com.example.ckgl.entity.ProductionPlan;
 import com.example.ckgl.service.PlanService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -21,6 +22,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -49,10 +51,11 @@ public class PlanController {
         return Result.ok(planService.alerts());
     }
 
-    /** 今日用料汇总：今天未完成计划所需零件，同型号合并、数量累加 */
+    /** 用料汇总：指定日期（默认今天）未完成计划所需零件，同型号合并、数量累加 */
     @GetMapping("/today-parts")
-    public Result<List<TodayPartVO>> todayParts() {
-        return Result.ok(planService.todayParts());
+    public Result<List<TodayPartVO>> todayParts(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        return Result.ok(planService.todayParts(date != null ? date : LocalDate.now()));
     }
 
     @PostMapping
