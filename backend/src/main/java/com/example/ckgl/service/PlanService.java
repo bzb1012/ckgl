@@ -56,11 +56,12 @@ public class PlanService extends ServiceImpl<ProductionPlanMapper, ProductionPla
         return new LambdaQueryWrapper<ProductionPlan>().apply("completed < quantity");
     }
 
-    public Page<PlanVO> page(String line, boolean onlyUndone, long page, long size) {
+    public Page<PlanVO> page(String line, LocalDate date, boolean onlyUndone, long page, long size) {
         LambdaQueryWrapper<ProductionPlan> wrapper = new LambdaQueryWrapper<>();
         if (line != null && !line.isBlank()) {
-            // 产线标签：只看该线今日计划
-            wrapper.eq(ProductionPlan::getLine, line).apply("plan_date = CURDATE()");
+            // 产线标签：看该线指定日期（默认今天）的计划
+            wrapper.eq(ProductionPlan::getLine, line)
+                    .apply("plan_date = {0}", date != null ? date : LocalDate.now());
         }
         if (onlyUndone) {
             wrapper.apply("completed < quantity");

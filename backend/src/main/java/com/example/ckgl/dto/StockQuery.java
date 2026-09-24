@@ -10,6 +10,8 @@ public class StockQuery {
     private Long partId;
     /** 零件型号/名称/货位编号 模糊 */
     private String keyword;
+    /** 是否隐藏库存为零的记录 */
+    private Boolean hideZero;
     private Integer page = 1;
     private Integer size = 10;
 }

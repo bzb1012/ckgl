@@ -47,7 +47,7 @@ const list = ref([])
 const total = ref(0)
 const warehouses = ref([])
 const locations = ref([])
-const query = reactive({ warehouseId: null, locationId: null, keyword: '', page: 1, size: 10 })
+const query = reactive({ warehouseId: null, locationId: null, keyword: '', hideZero: true, page: 1, size: 10 })
 
 const fetch = async () => {
   loading.value = true

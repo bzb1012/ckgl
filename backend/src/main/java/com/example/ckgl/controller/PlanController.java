@@ -34,10 +34,11 @@ public class PlanController {
 
     @GetMapping
     public Result<Page<PlanVO>> list(@RequestParam(required = false) String line,
+                                     @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
                                      @RequestParam(defaultValue = "false") boolean onlyUndone,
                                      @RequestParam(defaultValue = "1") long page,
                                      @RequestParam(defaultValue = "10") long size) {
-        return Result.ok(planService.page(line, onlyUndone, page, size));
+        return Result.ok(planService.page(line, date, onlyUndone, page, size));
     }
 
     /** 产线选项（顶部快捷标签） */

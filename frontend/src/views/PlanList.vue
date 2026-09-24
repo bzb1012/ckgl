@@ -28,10 +28,14 @@
 
     <!-- 产线快捷标签 -->
     <div class="line-tabs">
-      <el-radio-group v-model="lineTab" @change="handleLineChange">
+      <el-radio-group v-model="lineTab">
         <el-radio-button v-for="l in tabOptions" :key="l" :value="l">{{ tabLabel(l) }}</el-radio-button>
       </el-radio-group>
-      <span v-if="lineTab !== '全部'" class="line-hint">{{ t('plans.lineHint', { line: lineTab, date: today }) }}</span>
+      <template v-if="lineTab !== '全部'">
+        <el-date-picker v-model="lineDate" type="date" value-format="YYYY-MM-DD" :clearable="false"
+          style="width: 150px" />
+        <span class="line-hint">{{ t('plans.lineHint', { line: lineTab, date: lineDate }) }}</span>
+      </template>
     </div>
 
     <div class="toolbar">
@@ -192,11 +196,12 @@ const query = reactive({ page: 1, size: 10 })
 const onlyUndone = ref(false)
 
 // 产线快捷标签：全部 / 1线 / 2线 / 3线...（"全部"为内部哨兵值，展示文案走 i18n）
+const today = new Date().toISOString().slice(0, 10)
 const lineTab = ref('全部')
+const lineDate = ref(today)
 const lineOptions = ref(['1线', '2线', '3线'])
 const tabOptions = computed(() => ['全部', ...lineOptions.value])
 const tabLabel = l => (l === '全部' ? t('plans.all') : l)
-const today = new Date().toISOString().slice(0, 10)
 
 const alerts = ref([])
 const showAlerts = ref(false)
@@ -230,8 +235,11 @@ const fetch = async () => {
   loading.value = true
   try {
     const params = { onlyUndone: onlyUndone.value, page: query.page, size: query.size }
-    // 产线标签只看该线今日计划，"全部"看所有计划
-    if (lineTab.value !== '全部') params.line = lineTab.value
+    // 产线标签看该线指定日期（默认今天）的计划，"全部"看所有计划
+    if (lineTab.value !== '全部') {
+      params.line = lineTab.value
+      params.date = lineDate.value
+    }
     const data = await planApi.list(params)
     list.value = data.records
     total.value = data.total
@@ -244,10 +252,11 @@ const fetchLines = async () => {
   lineOptions.value = await planApi.lines()
 }
 
-const handleLineChange = () => {
+// 产线标签或日期变化时重新查询（日期手动输入时 change 事件不可靠，统一用 watch）
+watch([lineTab, lineDate], () => {
   query.page = 1
   fetch()
-}
+})
 
 const fetchAlerts = async () => {
   alerts.value = await planApi.alerts()
