@@ -13,7 +13,7 @@ export function setLocale(l) {
 const messages = {
   zh: {
     app: { title: '仓库管理系统' },
-    menu: { records: '出入库', stocks: '库存查询', plans: '生产计划', parts: '零件管理', products: '产品管理', warehouses: '仓库管理' },
+    menu: { records: '出入库', stocks: '库存查询', plans: '生产计划', stockTake: '库存盘点', parts: '零件管理', products: '产品管理', warehouses: '仓库管理' },
     common: {
       search: '查询', reset: '重置', save: '保存', cancel: '取消', confirm: '确定', close: '关闭',
       edit: '编辑', del: '删除', actions: '操作', remark: '备注', unit: '单位', category: '分类',
@@ -63,6 +63,14 @@ const messages = {
       allWarehouses: '全部仓库', allLocations: '全部货位', searchPh: '零件型号/名称/货位编号',
       locationCode: '货位编号', stockQty: '库存数量', updatedAt: '更新时间'
     },
+    stockTake: {
+      selectWarehouse: '请选择仓库', pickWarehouse: '请先选择仓库，点击货位开始盘点',
+      noLocations: '该仓库暂无货位', quantity: '盘点数量',
+      clear: '清空货位', clearConfirm: '确定清空货位 {code} 的全部物料吗？清空后数量全部归零（可在出入库流水追溯）',
+      clearOk: '已清空 {n} 种物料', addPart: '添加物料', addTitle: '添加物料',
+      pickPart: '选择零件', pickFirst: '请先选择零件',
+      delConfirm: '确定删除物料 {code} 吗？', back: '返回'
+    },
     plans: {
       alert: '库存预警：{n} 种零件库存不足（需求 + 安全库存 {safety}），共缺 {total}',
       details: '查看详情', hide: '收起',
@@ -90,7 +98,7 @@ const messages = {
   },
   en: {
     app: { title: 'Warehouse System' },
-    menu: { records: 'Records', stocks: 'Inventory', plans: 'Production Plans', parts: 'Parts', products: 'Products', warehouses: 'Warehouses' },
+    menu: { records: 'Records', stocks: 'Inventory', plans: 'Production Plans', stockTake: 'Stock Take', parts: 'Parts', products: 'Products', warehouses: 'Warehouses' },
     common: {
       search: 'Search', reset: 'Reset', save: 'Save', cancel: 'Cancel', confirm: 'OK', close: 'Close',
       edit: 'Edit', del: 'Delete', actions: 'Actions', remark: 'Remark', unit: 'Unit', category: 'Category',
@@ -139,6 +147,14 @@ const messages = {
     stocks: {
       allWarehouses: 'All Warehouses', allLocations: 'All Locations', searchPh: 'Part / name / location code',
       locationCode: 'Location', stockQty: 'Quantity', updatedAt: 'Updated'
+    },
+    stockTake: {
+      selectWarehouse: 'Select warehouse', pickWarehouse: 'Select a warehouse, then click a location to start',
+      noLocations: 'No locations in this warehouse', quantity: 'Counted Qty',
+      clear: 'Clear Location', clearConfirm: 'Clear all parts in {code}? Quantities will be zeroed (traceable in records)',
+      clearOk: 'Cleared {n} part(s)', addPart: 'Add Part', addTitle: 'Add Part',
+      pickPart: 'Select part', pickFirst: 'Select a part first',
+      delConfirm: 'Remove part {code}?', back: 'Back'
     },
     plans: {
       alert: 'Stock alert: {n} part(s) below demand (+ safety stock {safety}), total shortage {total}',
