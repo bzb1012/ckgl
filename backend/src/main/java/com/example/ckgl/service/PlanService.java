@@ -51,9 +51,11 @@ public class PlanService extends ServiceImpl<ProductionPlanMapper, ProductionPla
     @Autowired
     private StockMapper stockMapper;
 
-    /** 未完成计划条件：completed < quantity */
+    /** 未完成计划条件：日期在今天及以后且 completed < quantity（过去日期的计划视为已完成） */
     private LambdaQueryWrapper<ProductionPlan> undoneWrapper() {
-        return new LambdaQueryWrapper<ProductionPlan>().apply("completed < quantity");
+        return new LambdaQueryWrapper<ProductionPlan>()
+                .apply("plan_date >= {0}", LocalDate.now())
+                .apply("completed < quantity");
     }
 
     public Page<PlanVO> page(String line, LocalDate date, boolean onlyUndone, long page, long size) {
@@ -64,7 +66,7 @@ public class PlanService extends ServiceImpl<ProductionPlanMapper, ProductionPla
                     .apply("plan_date = {0}", date != null ? date : LocalDate.now());
         }
         if (onlyUndone) {
-            wrapper.apply("completed < quantity");
+            wrapper.apply("plan_date >= {0} AND completed < quantity", LocalDate.now());
         }
         wrapper.orderByAsc(ProductionPlan::getPlanDate).orderByAsc(ProductionPlan::getId);
         Page<ProductionPlan> result = this.page(new Page<>(page, size), wrapper);
@@ -94,8 +96,8 @@ public class PlanService extends ServiceImpl<ProductionPlanMapper, ProductionPla
             vo.setRemark(plan.getRemark());
             List<PlanPartVO> parts = partsOf(plan, demandMap, stockMap);
             vo.setParts(parts);
-            if (plan.getCompleted() >= plan.getQuantity()) {
-                // 已完成的计划不再消耗零件，不参与缺料判断，避免预警误报
+            if (plan.getCompleted() >= plan.getQuantity() || plan.getPlanDate().isBefore(LocalDate.now())) {
+                // 已完成（含过去日期自动视为完成）的计划不再消耗零件，不参与缺料判断，避免预警误报
                 vo.setShortages(List.of());
                 vo.setShortage(false);
             } else {
@@ -158,6 +160,10 @@ public class PlanService extends ServiceImpl<ProductionPlanMapper, ProductionPla
      * 已完成的计划不再消耗零件，不参与统计（与库存预警口径一致）。
      */
     public List<TodayPartVO> todayParts(LocalDate date) {
+        // 过去日期的计划视为已完成，不再统计用料
+        if (date.isBefore(LocalDate.now())) {
+            return List.of();
+        }
         List<ProductionPlan> plans = this.list(new LambdaQueryWrapper<ProductionPlan>()
                 .apply("plan_date = {0}", date)
                 .apply("completed < quantity"));
@@ -291,7 +297,8 @@ public class PlanService extends ServiceImpl<ProductionPlanMapper, ProductionPla
 
     /** 计划关联全部零件的库存对比：含足够与不足的零件 */
     private List<PlanPartVO> partsOf(ProductionPlan plan, Map<Long, Integer> demandMap, Map<Long, Integer> stockMap) {
-        int remaining = plan.getQuantity() - plan.getCompleted();
+        // 过去日期的计划视为已完成，剩余需求为 0
+        int remaining = plan.getPlanDate().isBefore(LocalDate.now()) ? 0 : plan.getQuantity() - plan.getCompleted();
         List<PlanPartVO> list = new ArrayList<>();
         for (ProductPartDetail pp : productPartMapper.selectByProductId(plan.getProductId())) {
             int demand = demandMap.getOrDefault(pp.getPartId(), 0);

@@ -54,7 +54,7 @@
       <el-table-column :label="t('plans.completed')" width="150" align="center">
         <template #default="{ row }">
           <el-input-number :model-value="row.completed" :min="0" :max="row.quantity" size="small"
-            @change="val => changeCompleted(row, val)" />
+            :disabled="row.planDate < today" @change="val => changeCompleted(row, val)" />
         </template>
       </el-table-column>
       <el-table-column :label="t('plans.status')" width="90" align="center">
@@ -62,7 +62,7 @@
           <el-tooltip v-if="row.shortages.length" :content="tooltip(row)" placement="top">
             <el-tag type="danger">{{ t('plans.tagShort') }}</el-tag>
           </el-tooltip>
-          <el-tag v-else-if="row.completed >= row.quantity" type="success">{{ t('plans.tagDone') }}</el-tag>
+          <el-tag v-else-if="row.completed >= row.quantity || row.planDate < today" type="success">{{ t('plans.tagDone') }}</el-tag>
           <el-tag v-else>{{ t('plans.tagReady') }}</el-tag>
         </template>
       </el-table-column>
@@ -152,7 +152,7 @@
           <el-tag>{{ detailPlan.line }}</el-tag>
           <span>{{ detailPlan.planDate }}</span>
           <span>{{ detailPlan.productCode }} / {{ detailPlan.productName }}</span>
-          <span>{{ t('plans.metaLine', { qty: detailPlan.quantity, done: detailPlan.completed, left: detailPlan.quantity - detailPlan.completed }) }}</span>
+          <span>{{ detailMeta }}</span>
         </div>
         <el-table :data="detailPlan.parts" border size="small">
           <el-table-column prop="partCode" :label="t('common.partCode')" min-width="100" />
@@ -196,7 +196,9 @@ const query = reactive({ page: 1, size: 10 })
 const onlyUndone = ref(false)
 
 // 产线快捷标签：全部 / 1线 / 2线 / 3线...（"全部"为内部哨兵值，展示文案走 i18n）
-const today = new Date().toISOString().slice(0, 10)
+// 本地日期 YYYY-MM-DD（toISOString 是 UTC，东八区凌晨会差一天）
+const localDate = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+const today = localDate(new Date())
 const lineTab = ref('全部')
 const lineDate = ref(today)
 const lineOptions = ref(['1线', '2线', '3线'])
@@ -215,6 +217,13 @@ const detailPlan = ref(null)
 const detailTitle = computed(() =>
   detailPlan.value ? t('plans.detailTitle', { line: detailPlan.value.line, code: detailPlan.value.productCode }) : ''
 )
+// 详情完成情况：过去日期的计划视为已完成
+const detailMeta = computed(() => {
+  const p = detailPlan.value
+  if (!p) return ''
+  const done = p.planDate < today ? p.quantity : p.completed
+  return t('plans.metaLine', { qty: p.quantity, done, left: p.quantity - done })
+})
 
 const dialogVisible = ref(false)
 const formRef = ref()
@@ -226,10 +235,7 @@ const rules = computed(() => ({
   quantity: [{ required: true, message: t('plans.qtyRequired'), trigger: 'blur' }]
 }))
 
-const defaultDate = () => {
-  const d = new Date(Date.now() + 86400000)
-  return d.toISOString().slice(0, 10)
-}
+const defaultDate = () => localDate(new Date(Date.now() + 86400000))
 
 const fetch = async () => {
   loading.value = true
