@@ -4,7 +4,7 @@
     <el-alert v-if="alerts.length" type="error" :closable="false" class="alert-banner">
       <template #title>
         <div class="alert-title">
-          <span>{{ t('plans.alert', { n: alerts.length, safety: alerts[0].safetyStock || 100, total: totalLack }) }}</span>
+          <span>{{ t('plans.alert', { n: alerts.length, total: totalLack }) }}</span>
           <el-button link type="primary" @click="showAlerts = !showAlerts">{{ showAlerts ? t('plans.hide') : t('plans.details') }}</el-button>
         </div>
       </template>
@@ -15,7 +15,6 @@
         <el-table-column v-if="!isMobile" prop="partName" :label="t('common.partName')" min-width="110" />
         <el-table-column prop="unit" :label="t('common.unit')" width="70" />
         <el-table-column prop="demand" :label="t('plans.demand')" width="90" align="center" />
-        <el-table-column prop="safetyStock" :label="t('plans.safety')" width="90" align="center" />
         <el-table-column prop="stock" :label="t('plans.stock')" width="90" align="center" />
         <el-table-column :label="t('plans.lack')" width="90" align="center">
           <template #default="{ row }">
@@ -70,7 +69,7 @@
         <template #default="{ row }">
           <template v-if="row.shortages.length">
             <div v-for="s in row.shortages" :key="s.partId" class="lack-line">
-              {{ t('plans.shortLine', { code: s.partCode, demand: s.demand, safety: s.safetyStock, stock: s.stock, lack: s.lack }) }}
+              {{ t('plans.shortLine', { code: s.partCode, demand: s.demand, stock: s.stock, lack: s.lack }) }}
             </div>
           </template>
           <span v-else>—</span>
@@ -170,7 +169,7 @@
           </el-table-column>
         </el-table>
         <div class="detail-tip">
-          {{ t('plans.tip', { safety: detailPlan.parts[0]?.safetyStock || 100 }) }}
+          {{ t('plans.tip') }}
         </div>
       </template>
     </el-dialog>

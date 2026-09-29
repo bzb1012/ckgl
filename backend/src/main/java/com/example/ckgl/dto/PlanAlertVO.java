@@ -14,9 +14,7 @@ public class PlanAlertVO {
     private Integer demand;
     /** 当前库存(全部货位合计) */
     private Integer stock;
-    /** 安全库存余量：库存需大于需求该数量 */
-    private Integer safetyStock;
-    /** 缺口 = 需求 + 安全库存 - 库存 */
+    /** 缺口 = 需求 - 库存 */
     private Integer lack;
     /** 涉及的未完成计划数 */
     private Integer planCount;

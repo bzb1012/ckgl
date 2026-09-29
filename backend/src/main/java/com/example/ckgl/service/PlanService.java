@@ -2,6 +2,7 @@ package com.example.ckgl.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.example.ckgl.common.BusinessException;
@@ -39,9 +40,6 @@ import java.util.regex.Pattern;
 @Service
 public class PlanService extends ServiceImpl<ProductionPlanMapper, ProductionPlan> {
 
-    /** 安全库存余量：库存需大于(需求+100)，否则预警 */
-    public static final int SAFETY_STOCK = 100;
-
     @Autowired
     private ProductMapper productMapper;
     @Autowired
@@ -59,6 +57,11 @@ public class PlanService extends ServiceImpl<ProductionPlanMapper, ProductionPla
     }
 
     public Page<PlanVO> page(String line, LocalDate date, boolean onlyUndone, long page, long size) {
+        // 过去日期未完成的计划自动置为已完成（completed = quantity），数据落库保持口径一致
+        this.update(new LambdaUpdateWrapper<ProductionPlan>()
+                .apply("plan_date < {0}", LocalDate.now())
+                .apply("completed < quantity")
+                .setSql("completed = quantity"));
         LambdaQueryWrapper<ProductionPlan> wrapper = new LambdaQueryWrapper<>();
         if (line != null && !line.isBlank()) {
             // 产线标签：看该线指定日期（默认今天）的计划
@@ -136,8 +139,8 @@ public class PlanService extends ServiceImpl<ProductionPlanMapper, ProductionPla
         for (Part part : parts) {
             int demand = demandMap.getOrDefault(part.getId(), 0);
             int stock = stockMap.getOrDefault(part.getId(), 0);
-            // 预警规则：库存需大于(需求 + 安全库存100)，否则预警
-            if (stock < demand + SAFETY_STOCK) {
+            // 预警规则：库存小于需求即预警
+            if (stock < demand) {
                 PlanAlertVO vo = new PlanAlertVO();
                 vo.setPartId(part.getId());
                 vo.setPartCode(part.getCode());
@@ -145,8 +148,7 @@ public class PlanService extends ServiceImpl<ProductionPlanMapper, ProductionPla
                 vo.setUnit(part.getUnit());
                 vo.setDemand(demand);
                 vo.setStock(stock);
-                vo.setSafetyStock(SAFETY_STOCK);
-                vo.setLack(demand + SAFETY_STOCK - stock);
+                vo.setLack(demand - stock);
                 vo.setPlanCount(planCount.getOrDefault(part.getId(), 0));
                 alerts.add(vo);
             }
@@ -257,6 +259,9 @@ public class PlanService extends ServiceImpl<ProductionPlanMapper, ProductionPla
         if (plan == null) {
             throw new BusinessException("计划不存在");
         }
+        if (plan.getPlanDate().isBefore(LocalDate.now())) {
+            throw new BusinessException("过去日期的计划已自动完成，不允许修改已完成数量");
+        }
         if (dto.getCompleted() > plan.getQuantity()) {
             throw new BusinessException("已完成数量不能大于计划数量 " + plan.getQuantity());
         }
@@ -303,7 +308,7 @@ public class PlanService extends ServiceImpl<ProductionPlanMapper, ProductionPla
         for (ProductPartDetail pp : productPartMapper.selectByProductId(plan.getProductId())) {
             int demand = demandMap.getOrDefault(pp.getPartId(), 0);
             int stock = stockMap.getOrDefault(pp.getPartId(), 0);
-            int lack = demand + SAFETY_STOCK - stock;
+            int lack = demand - stock;
             PlanPartVO vo = new PlanPartVO();
             vo.setPartId(pp.getPartId());
             vo.setPartCode(pp.getPartCode());
@@ -312,7 +317,6 @@ public class PlanService extends ServiceImpl<ProductionPlanMapper, ProductionPla
             vo.setUsage(pp.getQuantity());
             vo.setNeed(pp.getQuantity() * remaining);
             vo.setDemand(demand);
-            vo.setSafetyStock(SAFETY_STOCK);
             vo.setStock(stock);
             vo.setLack(lack);
             vo.setEnough(lack <= 0);
