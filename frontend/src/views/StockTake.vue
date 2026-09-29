@@ -29,7 +29,7 @@
 
     <!-- 第二步：库位物料明细 -->
     <template v-else>
-      <el-table :data="items" v-loading="loading" border size="default">
+      <el-table :data="visibleItems" v-loading="loading" border size="default">
         <el-table-column prop="partCode" :label="t('common.partCode')" min-width="130" />
         <el-table-column v-if="!isMobile" prop="partName" :label="t('common.partName')" min-width="130" />
         <el-table-column v-if="!isMobile" prop="unit" :label="t('common.unit')" width="70" align="center" />
@@ -71,7 +71,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import warehouseApi from '../api/warehouse'
 import partApi from '../api/part'
@@ -89,6 +89,8 @@ const locLoading = ref(false)
 
 const currentLocation = ref(null)
 const items = ref([])
+// 展示时过滤数量为零的物料（改零/清空后自动隐藏）
+const visibleItems = computed(() => items.value.filter(i => i.quantity > 0))
 const loading = ref(false)
 const saving = ref(false)
 
