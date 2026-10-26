@@ -4,6 +4,7 @@ import com.example.ckgl.common.Result;
 import com.example.ckgl.dto.ProductionDayInDTO;
 import com.example.ckgl.dto.ProductionEntryDTO;
 import com.example.ckgl.dto.ProductionLedgerVO;
+import com.example.ckgl.dto.ProductionOutExportVO;
 import com.example.ckgl.dto.ProductionOutRowVO;
 import com.example.ckgl.dto.ProductionSettleDTO;
 import com.example.ckgl.service.ProductionService;
@@ -62,6 +63,14 @@ public class ProductionController {
     public Result<List<ProductionOutRowVO>> dailySummary(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         return Result.ok(productionService.dailySummary(date != null ? date : LocalDate.now()));
+    }
+
+    /** 导出数据：日期区间的逐日用料汇总 + 区间合计 */
+    @GetMapping("/out-export")
+    public Result<ProductionOutExportVO> outExport(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate start,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate end) {
+        return Result.ok(productionService.outExport(start, end));
     }
 
     /** 结算上月库存到所选月份期初，返回零件数 */

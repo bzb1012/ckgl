@@ -86,7 +86,11 @@ const messages = {
       need: '计划需求', outToday: '已出库', thisOut: '本次出库',
       outBtn: '出库', outOk: '出库成功，当日累计 {n}',
       outEmpty: '该日期暂无用料汇总（没有生产计划）',
-      outTip: '展示所选日期的用料汇总，每次录入的出库数量按日累加'
+      outTip: '展示所选日期的用料汇总，每次录入的出库数量按日累加',
+      exportExcel: '导出 Excel', exportEmpty: '没有可导出的数据',
+      exportRange: '日期范围', exportTotal: '合计',
+      exportTip: '第一个工作表为区间合计，之后每个日期一个工作表',
+      fileNameIn: '生产入库', fileNameOut: '产线出库'
     },
     plans: {
       alert: '库存预警：{n} 种零件库存不足，共缺 {total}',
@@ -108,8 +112,8 @@ const messages = {
       enough: '足够',
       tip: '状态规则：当前库存 ≥ 总需求视为足够；总需求为所有未完成计划的需求之和',
       todayParts: '用料汇总', todayTitle: '用料汇总 - {date}',
-      totalNeed: '需求总数', todayEmpty: '该日期暂无未完成的生产计划',
-      todayTip: '统计所选日期所有未完成计划的剩余需求（已完成部分不扣料），相同零件已合并、数量累加',
+      totalNeed: '需求总数', todayEmpty: '该日期暂无生产计划',
+      todayTip: '统计所选日期全部计划的计划需求（按计划数量，不受已完成数量影响；已完成计划同样统计，相同零件已合并累加）',
       completedOk: '已更新完成数量', delConfirm: '确定删除该计划吗？'
     }
   },
@@ -188,7 +192,11 @@ const messages = {
       need: 'Plan Need', outToday: 'Out Today', thisOut: 'Out Now',
       outBtn: 'Out', outOk: 'Outbound success, today total {n}',
       outEmpty: 'No parts summary for this date (no plans)',
-      outTip: 'Shows the parts summary of the selected date; each entry accumulates into that day'
+      outTip: 'Shows the parts summary of the selected date; each entry accumulates into that day',
+      exportExcel: 'Export Excel', exportEmpty: 'No data to export',
+      exportRange: 'Date Range', exportTotal: 'Total',
+      exportTip: 'The first sheet is the range total, followed by one sheet per date',
+      fileNameIn: 'Production In', fileNameOut: 'Line Out'
     },
     plans: {
       alert: 'Stock alert: {n} part(s) below demand, total shortage {total}',
@@ -210,8 +218,8 @@ const messages = {
       enough: 'OK',
       tip: 'Rule: stock >= total demand is enough; total demand sums all unfinished plans',
       todayParts: 'Parts Summary', todayTitle: 'Parts Summary - {date}',
-      totalNeed: 'Total Need', todayEmpty: 'No unfinished plans on this date',
-      todayTip: 'Sums remaining demand of all unfinished plans on the selected date (completed qty excluded); same parts merged with quantities accumulated',
+      totalNeed: 'Total Need', todayEmpty: 'No plans on this date',
+      todayTip: 'Sums the planned demand of all plans on the selected date (full planned qty, completion ignored); same parts merged with quantities accumulated',
       completedOk: 'Completed updated', delConfirm: 'Delete this plan?'
     }
   }

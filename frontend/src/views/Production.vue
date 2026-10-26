@@ -10,6 +10,7 @@
           <el-date-picker v-model="month" type="month" value-format="YYYY-MM" :clearable="false" style="width: 150px" @change="loadLedger" />
           <div class="spacer"></div>
           <el-button @click="handleSettle">{{ t('production.settle') }}</el-button>
+          <el-button @click="exportLedger">{{ t('production.exportExcel') }}</el-button>
         </div>
         <div class="tip">{{ t('production.inTip') }}</div>
 
@@ -46,6 +47,7 @@
           <el-date-picker v-model="outDate" type="date" value-format="YYYY-MM-DD" :clearable="false" style="width: 150px" @change="loadSummary" />
           <div class="spacer"></div>
           <span class="tip">{{ t('production.outTip') }}</span>
+          <el-button @click="openExport">{{ t('production.exportExcel') }}</el-button>
         </div>
 
         <el-empty v-if="!outRows.length && !outLoading" :description="t('production.outEmpty')" />
@@ -72,6 +74,20 @@
         </el-table>
       </el-tab-pane>
     </el-tabs>
+
+    <!-- 产线出库导出：选择日期范围 -->
+    <el-dialog v-model="exportVisible" :title="t('production.exportExcel')" width="480px">
+      <el-form label-width="90px">
+        <el-form-item :label="t('production.exportRange')">
+          <el-date-picker v-model="exportRange" type="daterange" value-format="YYYY-MM-DD" :clearable="false" style="width: 100%" />
+        </el-form-item>
+      </el-form>
+      <div class="tip">{{ t('production.exportTip') }}</div>
+      <template #footer>
+        <el-button @click="exportVisible = false">{{ t('common.cancel') }}</el-button>
+        <el-button type="primary" :loading="exporting" @click="doExportOut">{{ t('common.confirm') }}</el-button>
+      </template>
+    </el-dialog>
   </el-card>
 </template>
 
@@ -80,6 +96,7 @@ import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import productionApi from '../api/production'
 import partApi from '../api/part'
+import * as XLSX from 'xlsx'
 import { useResponsive } from '../composables/useResponsive'
 import { useI18n } from '../i18n'
 
@@ -139,6 +156,78 @@ const changeDailyIn = async (row, day, val) => {
   row.inTotal = row.dailyIn.reduce((sum, n) => sum + (n || 0), 0)
   row.current = row.opening + row.inTotal - row.outTotal
   ElMessage.success(t('common.saveOk'))
+}
+
+/* ---------- 导出 Excel ---------- */
+const makeSheet = (head, rows, widths) => {
+  const ws = XLSX.utils.aoa_to_sheet([head, ...rows])
+  ws['!cols'] = widths
+  return ws
+}
+
+const exportLedger = () => {
+  if (!ledger.value.items.length) {
+    ElMessage.warning(t('production.exportEmpty'))
+    return
+  }
+  const days = Array.from({ length: ledger.value.days }, (_, i) => t('production.day', { d: i + 1 }))
+  const head = [
+    t('common.partCode'), t('common.partName'), t('common.unit'),
+    t('production.lastMonth'), t('production.current'), ...days
+  ]
+  const rows = ledger.value.items.map(r => [
+    r.partCode, r.partName || '', r.unit || '', r.opening, r.current,
+    ...Array.from({ length: ledger.value.days }, (_, i) => r.dailyIn?.[i] || 0)
+  ])
+  const widths = [
+    { wch: 14 }, { wch: 18 }, { wch: 6 }, { wch: 10 }, { wch: 10 },
+    ...Array.from({ length: ledger.value.days }, () => ({ wch: 5 }))
+  ]
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, makeSheet(head, rows, widths), t('production.fileNameIn').slice(0, 31))
+  XLSX.writeFile(wb, `${t('production.fileNameIn')}-${month.value}.xlsx`)
+}
+
+const exportVisible = ref(false)
+const exporting = ref(false)
+const exportRange = ref([])
+
+const openExport = () => {
+  const day = outDate.value
+  exportRange.value = [`${day.slice(0, 7)}-01`, day]
+  exportVisible.value = true
+}
+
+const outHead = () => [
+  t('common.partCode'), t('common.partName'), t('common.unit'),
+  t('production.need'), t('production.outToday')
+]
+const outWidths = [{ wch: 14 }, { wch: 18 }, { wch: 6 }, { wch: 12 }, { wch: 10 }]
+const outExportRows = rows => rows.map(r => [r.partCode, r.partName || '', r.unit || '', r.totalNeed, r.outTotal])
+
+const doExportOut = async () => {
+  if (!exportRange.value?.length) {
+    return
+  }
+  const [start, end] = exportRange.value
+  exporting.value = true
+  try {
+    const data = await productionApi.dailyRange({ start, end })
+    if (!data.total?.length) {
+      ElMessage.warning(t('production.exportEmpty'))
+      return
+    }
+    const wb = XLSX.utils.book_new()
+    const head = outHead()
+    XLSX.utils.book_append_sheet(wb, makeSheet(head, outExportRows(data.total), outWidths), t('production.exportTotal'))
+    data.days.forEach(d => {
+      XLSX.utils.book_append_sheet(wb, makeSheet(head, outExportRows(d.rows), outWidths), d.date)
+    })
+    XLSX.writeFile(wb, `${t('production.fileNameOut')}-${start}_${end}.xlsx`)
+    exportVisible.value = false
+  } finally {
+    exporting.value = false
+  }
 }
 
 /* ---------- 产线出库 ---------- */

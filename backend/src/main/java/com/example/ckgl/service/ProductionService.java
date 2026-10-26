@@ -7,6 +7,7 @@ import com.example.ckgl.dto.ProductPartDetail;
 import com.example.ckgl.dto.ProductionEntryDTO;
 import com.example.ckgl.dto.ProductionLedgerItemVO;
 import com.example.ckgl.dto.ProductionLedgerVO;
+import com.example.ckgl.dto.ProductionOutExportVO;
 import com.example.ckgl.dto.ProductionOutRowVO;
 import com.example.ckgl.entity.Part;
 import com.example.ckgl.entity.PartMonthSettle;
@@ -163,20 +164,16 @@ public class ProductionService {
 
     /**
      * 产线出库页数据：所选日期的计划用料汇总 + 当日已出库合计。
-     * 过去日期按完整计划数量计算（已完成标记只用于生产进度，不代表当天没用料）。
+     * 按计划数量统计，不考虑已完成数量；已完成计划与过去日期同样统计。
      */
     public List<ProductionOutRowVO> dailySummary(LocalDate date) {
-        boolean past = date.isBefore(LocalDate.now());
         List<ProductionPlan> plans = productionPlanMapper.selectList(
                 new LambdaQueryWrapper<ProductionPlan>().apply("plan_date = {0}", date));
 
         Map<Long, Integer> needMap = new HashMap<>();
         Map<Long, Integer> planCount = new HashMap<>();
         for (ProductionPlan plan : plans) {
-            int quantity = past ? plan.getQuantity() : Math.max(plan.getQuantity() - plan.getCompleted(), 0);
-            if (quantity <= 0) {
-                continue;
-            }
+            int quantity = plan.getQuantity();
             Set<Long> seen = new HashSet<>();
             for (ProductPartDetail pp : productPartMapper.selectByProductId(plan.getProductId())) {
                 needMap.merge(pp.getPartId(), pp.getQuantity() * quantity, Integer::sum);
@@ -204,6 +201,108 @@ public class ProductionService {
         }
         rows.sort(Comparator.comparing(ProductionOutRowVO::getPartCode));
         return rows;
+    }
+
+    /**
+     * 产线出库导出：日期区间内逐日用料汇总，并给出区间合计。
+     * 按计划数量统计，不考虑已完成数量。
+     */
+    public ProductionOutExportVO outExport(LocalDate start, LocalDate end) {
+        if (end.isBefore(start)) {
+            throw new BusinessException("结束日期不能早于开始日期");
+        }
+        List<ProductionPlan> plans = productionPlanMapper.selectList(
+                new LambdaQueryWrapper<ProductionPlan>()
+                        .ge(ProductionPlan::getPlanDate, start)
+                        .le(ProductionPlan::getPlanDate, end));
+
+        Map<LocalDate, Map<Long, Integer>> needByDate = new HashMap<>();
+        Map<LocalDate, Map<Long, Integer>> countByDate = new HashMap<>();
+        Set<Long> partIds = new HashSet<>();
+        for (ProductionPlan plan : plans) {
+            Map<Long, Integer> need = needByDate.computeIfAbsent(plan.getPlanDate(), k -> new HashMap<>());
+            Map<Long, Integer> count = countByDate.computeIfAbsent(plan.getPlanDate(), k -> new HashMap<>());
+            Set<Long> seen = new HashSet<>();
+            for (ProductPartDetail pp : productPartMapper.selectByProductId(plan.getProductId())) {
+                need.merge(pp.getPartId(), pp.getQuantity() * plan.getQuantity(), Integer::sum);
+                if (seen.add(pp.getPartId())) {
+                    count.merge(pp.getPartId(), 1, Integer::sum);
+                }
+                partIds.add(pp.getPartId());
+            }
+        }
+
+        Map<Long, Part> partMap = new HashMap<>();
+        if (!partIds.isEmpty()) {
+            for (Part part : partMapper.selectBatchIds(partIds)) {
+                partMap.put(part.getId(), part);
+            }
+        }
+
+        Map<LocalDate, Map<Long, Integer>> outByDate = outTotalsByDate(start, end.plusDays(1));
+        List<ProductionOutExportVO.DaySheet> days = new ArrayList<>();
+        Map<Long, Integer> totalNeed = new HashMap<>();
+        Map<Long, Integer> totalCount = new HashMap<>();
+        Map<Long, Integer> totalOut = new HashMap<>();
+        for (LocalDate d = start; !d.isAfter(end); d = d.plusDays(1)) {
+            Map<Long, Integer> need = needByDate.getOrDefault(d, Map.of());
+            Map<Long, Integer> count = countByDate.getOrDefault(d, Map.of());
+            Map<Long, Integer> out = outByDate.getOrDefault(d, Map.of());
+
+            ProductionOutExportVO.DaySheet sheet = new ProductionOutExportVO.DaySheet();
+            sheet.setDate(d.toString());
+            sheet.setRows(exportRows(need, count, out, partMap));
+            days.add(sheet);
+
+            need.forEach((k, v) -> totalNeed.merge(k, v, Integer::sum));
+            count.forEach((k, v) -> totalCount.merge(k, v, Integer::sum));
+            out.forEach((k, v) -> totalOut.merge(k, v, Integer::sum));
+        }
+
+        ProductionOutExportVO result = new ProductionOutExportVO();
+        result.setDays(days);
+        result.setTotal(exportRows(totalNeed, totalCount, totalOut, partMap));
+        return result;
+    }
+
+    private List<ProductionOutExportVO.DailyRow> exportRows(Map<Long, Integer> need,
+                                                            Map<Long, Integer> count,
+                                                            Map<Long, Integer> out,
+                                                            Map<Long, Part> partMap) {
+        List<ProductionOutExportVO.DailyRow> rows = new ArrayList<>();
+        for (Long partId : need.keySet()) {
+            Part part = partMap.get(partId);
+            if (part == null) {
+                continue;
+            }
+            ProductionOutExportVO.DailyRow row = new ProductionOutExportVO.DailyRow();
+            row.setPartCode(part.getCode());
+            row.setPartName(part.getName());
+            row.setUnit(part.getUnit());
+            row.setTotalNeed(need.getOrDefault(partId, 0));
+            row.setPlanCount(count.getOrDefault(partId, 0));
+            row.setOutTotal(out.getOrDefault(partId, 0));
+            rows.add(row);
+        }
+        rows.sort(Comparator.comparing(ProductionOutExportVO.DailyRow::getPartCode));
+        return rows;
+    }
+
+    /** 按日期+零件汇总出库数量，[from, to) */
+    private Map<LocalDate, Map<Long, Integer>> outTotalsByDate(LocalDate from, LocalDate to) {
+        QueryWrapper<PartProductionOut> qw = new QueryWrapper<PartProductionOut>()
+                .select("out_date AS outDate", "part_id AS partId", "IFNULL(SUM(quantity),0) AS total")
+                .ge("out_date", from)
+                .lt("out_date", to)
+                .groupBy("out_date", "part_id");
+        Map<LocalDate, Map<Long, Integer>> result = new HashMap<>();
+        for (Map<String, Object> row : outMapper.selectMaps(qw)) {
+            LocalDate date = LocalDate.parse(row.get("outDate").toString());
+            Long partId = ((Number) row.get("partId")).longValue();
+            int total = ((Number) row.get("total")).intValue();
+            result.computeIfAbsent(date, k -> new HashMap<>()).put(partId, total);
+        }
+        return result;
     }
 
     /**
