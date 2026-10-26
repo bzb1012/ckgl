@@ -112,8 +112,9 @@ const messages = {
       enough: '足够',
       tip: '状态规则：当前库存 ≥ 总需求视为足够；总需求为所有未完成计划的需求之和',
       todayParts: '用料汇总', todayTitle: '用料汇总 - {date}',
-      totalNeed: '需求总数', todayEmpty: '该日期暂无生产计划',
-      todayTip: '统计所选日期全部计划的计划需求（按计划数量，不受已完成数量影响；已完成计划同样统计，相同零件已合并累加）',
+      totalNeed: '需求总数', completedNeed: '已完成计划需求',
+      todayEmpty: '该日期暂无生产计划',
+      todayTip: '统计所选日期全部计划的计划需求（按计划数量，不受已完成数量影响）；「已完成计划需求」为其中已完成计划的需求，相同零件已合并累加',
       completedOk: '已更新完成数量', delConfirm: '确定删除该计划吗？'
     }
   },
@@ -218,8 +219,9 @@ const messages = {
       enough: 'OK',
       tip: 'Rule: stock >= total demand is enough; total demand sums all unfinished plans',
       todayParts: 'Parts Summary', todayTitle: 'Parts Summary - {date}',
-      totalNeed: 'Total Need', todayEmpty: 'No plans on this date',
-      todayTip: 'Sums the planned demand of all plans on the selected date (full planned qty, completion ignored); same parts merged with quantities accumulated',
+      totalNeed: 'Total Need', completedNeed: 'Completed Plan Need',
+      todayEmpty: 'No plans on this date',
+      todayTip: 'Sums the planned demand of all plans on the selected date (full planned qty, completion ignored); "Completed Plan Need" is the portion from completed plans, same parts merged',
       completedOk: 'Completed updated', delConfirm: 'Delete this plan?'
     }
   }

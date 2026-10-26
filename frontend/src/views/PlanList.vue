@@ -108,6 +108,7 @@
             <span class="lack">{{ row.totalNeed }}</span>
           </template>
         </el-table-column>
+        <el-table-column prop="completedNeed" :label="t('plans.completedNeed')" width="120" align="center" />
         <el-table-column prop="planCount" :label="t('plans.planCount')" width="90" align="center" />
         <el-table-column prop="stock" :label="t('plans.stock')" width="90" align="center" />
       </el-table>

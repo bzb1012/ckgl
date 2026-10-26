@@ -159,18 +159,24 @@ public class PlanService extends ServiceImpl<ProductionPlanMapper, ProductionPla
 
     /**
      * 指定日期的用料汇总：该日期全部计划的需求，按零件合并、数量累加。
-     * 按计划数量统计，不考虑已完成数量；已完成计划与过去日期同样统计。
+     * 按计划数量统计，不考虑已完成数量；同时给出其中已完成计划的零件需求。
      */
     public List<TodayPartVO> todayParts(LocalDate date) {
         List<ProductionPlan> plans = this.list(new LambdaQueryWrapper<ProductionPlan>()
                 .apply("plan_date = {0}", date));
+        boolean past = date.isBefore(LocalDate.now());
         Map<Long, Integer> needMap = new HashMap<>();
+        Map<Long, Integer> completedNeed = new HashMap<>();
         Map<Long, Integer> planCount = new HashMap<>();
         for (ProductionPlan plan : plans) {
             int quantity = plan.getQuantity();
+            boolean done = past || plan.getCompleted() >= plan.getQuantity();
             Set<Long> seen = new HashSet<>();
             for (ProductPartDetail pp : productPartMapper.selectByProductId(plan.getProductId())) {
                 needMap.merge(pp.getPartId(), pp.getQuantity() * quantity, Integer::sum);
+                if (done) {
+                    completedNeed.merge(pp.getPartId(), pp.getQuantity() * quantity, Integer::sum);
+                }
                 // 同一计划内同一零件只计一次计划数
                 if (seen.add(pp.getPartId())) {
                     planCount.merge(pp.getPartId(), 1, Integer::sum);
@@ -189,6 +195,7 @@ public class PlanService extends ServiceImpl<ProductionPlanMapper, ProductionPla
             vo.setPartName(part.getName());
             vo.setUnit(part.getUnit());
             vo.setTotalNeed(needMap.get(part.getId()));
+            vo.setCompletedNeed(completedNeed.getOrDefault(part.getId(), 0));
             vo.setPlanCount(planCount.getOrDefault(part.getId(), 0));
             vo.setStock(stockMap.getOrDefault(part.getId(), 0));
             result.add(vo);
