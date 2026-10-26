@@ -15,7 +15,7 @@
         <div class="tip">{{ t('production.inTip') }}</div>
 
         <el-empty v-if="!ledger.items.length && !ledgerLoading" :description="t('production.emptyParts')" />
-        <el-table v-else :data="ledger.items" v-loading="ledgerLoading" border size="default" max-height="560">
+        <el-table v-else :data="ledger.items" v-loading="ledgerLoading" border size="small" max-height="560">
           <el-table-column prop="partCode" fixed="left" width="140" :label="t('common.partCode')" />
           <el-table-column v-if="!isMobile" prop="partName" width="150" :label="t('common.partName')" />
           <el-table-column v-if="!isMobile" prop="unit" width="60" align="center" :label="t('common.unit')" />
@@ -29,20 +29,21 @@
           </el-table-column>
           <el-table-column v-for="d in ledger.days" :key="d" width="64" align="center" :label="t('production.day', { d })">
             <template #default="{ row }">
-              <el-input-number
-                :model-value="row.dailyIn?.[d - 1] || undefined"
-                :min="0"
-                :controls="false"
-                size="small"
+              <input
                 class="cell-input"
-                @change="val => changeDailyIn(row, d, val)" />
+                type="number"
+                min="0"
+                step="1"
+                :value="row.dailyIn?.[d - 1] || ''"
+                @change="e => changeDailyIn(row, d, e.target)"
+                @keydown.enter.prevent="e => e.target.blur()" />
             </template>
           </el-table-column>
         </el-table>
       </el-tab-pane>
 
       <!-- 产线出库：每日用料汇总 + 手动累加 -->
-      <el-tab-pane :label="t('production.tabOut')" name="out">
+      <el-tab-pane :label="t('production.tabOut')" name="out" lazy>
         <div class="toolbar">
           <el-date-picker v-model="outDate" type="date" value-format="YYYY-MM-DD" :clearable="false" style="width: 150px" @change="loadSummary" />
           <div class="spacer"></div>
@@ -96,7 +97,6 @@ import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import productionApi from '../api/production'
 import partApi from '../api/part'
-import * as XLSX from 'xlsx'
 import { useResponsive } from '../composables/useResponsive'
 import { useI18n } from '../i18n'
 
@@ -142,12 +142,14 @@ const handleSettle = async () => {
 }
 
 /* ---------- 每日入库单元格编辑 ---------- */
-const changeDailyIn = async (row, day, val) => {
+const changeDailyIn = async (row, day, target) => {
   if (!row.dailyIn) {
     row.dailyIn = []
   }
-  const quantity = val == null ? 0 : val
+  const input = target.value === '' ? 0 : Math.floor(Number(target.value))
+  const quantity = Number.isFinite(input) && input > 0 ? input : 0
   if (quantity === (row.dailyIn[day - 1] || 0)) {
+    target.value = quantity || ''
     return
   }
   const date = `${month.value}-${String(day).padStart(2, '0')}`
@@ -155,21 +157,23 @@ const changeDailyIn = async (row, day, val) => {
   row.dailyIn[day - 1] = quantity
   row.inTotal = row.dailyIn.reduce((sum, n) => sum + (n || 0), 0)
   row.current = row.opening + row.inTotal - row.outTotal
+  target.value = quantity || ''
   ElMessage.success(t('common.saveOk'))
 }
 
 /* ---------- 导出 Excel ---------- */
-const makeSheet = (head, rows, widths) => {
+const makeSheet = (XLSX, head, rows, widths) => {
   const ws = XLSX.utils.aoa_to_sheet([head, ...rows])
   ws['!cols'] = widths
   return ws
 }
 
-const exportLedger = () => {
+const exportLedger = async () => {
   if (!ledger.value.items.length) {
     ElMessage.warning(t('production.exportEmpty'))
     return
   }
+  const XLSX = await import('xlsx')
   const days = Array.from({ length: ledger.value.days }, (_, i) => t('production.day', { d: i + 1 }))
   const head = [
     t('common.partCode'), t('common.partName'), t('common.unit'),
@@ -184,7 +188,7 @@ const exportLedger = () => {
     ...Array.from({ length: ledger.value.days }, () => ({ wch: 5 }))
   ]
   const wb = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(wb, makeSheet(head, rows, widths), t('production.fileNameIn').slice(0, 31))
+  XLSX.utils.book_append_sheet(wb, makeSheet(XLSX, head, rows, widths), t('production.fileNameIn').slice(0, 31))
   XLSX.writeFile(wb, `${t('production.fileNameIn')}-${month.value}.xlsx`)
 }
 
@@ -212,6 +216,7 @@ const doExportOut = async () => {
   const [start, end] = exportRange.value
   exporting.value = true
   try {
+    const XLSX = await import('xlsx')
     const data = await productionApi.dailyRange({ start, end })
     if (!data.total?.length) {
       ElMessage.warning(t('production.exportEmpty'))
@@ -219,9 +224,9 @@ const doExportOut = async () => {
     }
     const wb = XLSX.utils.book_new()
     const head = outHead()
-    XLSX.utils.book_append_sheet(wb, makeSheet(head, outExportRows(data.total), outWidths), t('production.exportTotal'))
+    XLSX.utils.book_append_sheet(wb, makeSheet(XLSX, head, outExportRows(data.total), outWidths), t('production.exportTotal'))
     data.days.forEach(d => {
-      XLSX.utils.book_append_sheet(wb, makeSheet(head, outExportRows(d.rows), outWidths), d.date)
+      XLSX.utils.book_append_sheet(wb, makeSheet(XLSX, head, outExportRows(d.rows), outWidths), d.date)
     })
     XLSX.writeFile(wb, `${t('production.fileNameOut')}-${start}_${end}.xlsx`)
     exportVisible.value = false
@@ -276,11 +281,30 @@ onMounted(async () => {
   color: #67c23a;
   font-weight: 600;
 }
-:deep(.cell-input) {
-  width: 54px;
-}
-:deep(.cell-input .el-input__inner) {
+/* 台账单元格：用原生 input 代替 el-input-number，31 列 × 多行时渲染更快 */
+.cell-input {
+  width: 100%;
+  height: 24px;
+  padding: 0 2px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
   text-align: center;
-  padding: 0 4px;
+  outline: none;
+  appearance: textfield;
+}
+.cell-input::-webkit-outer-spin-button,
+.cell-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.cell-input:hover {
+  border-color: var(--el-border-color);
+}
+.cell-input:focus {
+  border-color: var(--el-color-primary);
+  background: var(--el-fill-color-blank);
 }
 </style>
