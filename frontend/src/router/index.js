@@ -9,6 +9,7 @@ const pages = [
   { path: '/admin/warehouses', name: 'warehouses', component: () => import('../views/WarehouseList.vue'), meta: { titleKey: 'menu.warehouses' } },
   { path: '/stocks', name: 'stocks', component: () => import('../views/StockList.vue'), meta: { titleKey: 'menu.stocks' } },
   { path: '/stock-take', name: 'stockTake', component: () => import('../views/StockTake.vue'), meta: { titleKey: 'menu.stockTake' } },
+  { path: '/production', name: 'production', component: () => import('../views/Production.vue'), meta: { titleKey: 'menu.production' } },
   { path: '/plans', name: 'plans', component: () => import('../views/PlanList.vue'), meta: { titleKey: 'menu.plans' } },
   { path: '/records', name: 'records', component: () => import('../views/RecordList.vue'), meta: { titleKey: 'menu.records' } }
 ]

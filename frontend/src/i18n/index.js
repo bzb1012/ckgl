@@ -13,7 +13,7 @@ export function setLocale(l) {
 const messages = {
   zh: {
     app: { title: '仓库管理系统' },
-    menu: { records: '出入库', stocks: '库存查询', plans: '生产计划', stockTake: '库存盘点', parts: '零件管理', products: '产品管理', warehouses: '仓库管理' },
+    menu: { records: '出入库', stocks: '库存查询', plans: '生产计划', stockTake: '库存盘点', production: '生产出入库', parts: '零件管理', products: '产品管理', warehouses: '仓库管理' },
     common: {
       search: '查询', reset: '重置', save: '保存', cancel: '取消', confirm: '确定', close: '关闭',
       edit: '编辑', del: '删除', actions: '操作', remark: '备注', unit: '单位', category: '分类',
@@ -71,6 +71,23 @@ const messages = {
       pickPart: '选择零件', pickFirst: '请先选择零件',
       delConfirm: '确定删除物料 {code} 吗？', back: '返回'
     },
+    production: {
+      tabIn: '生产入库', tabOut: '产线出库',
+      allCategories: '全部分类', month: '月份',
+      lastMonth: '上月库存', current: '本月库存', day: '{d}日',
+      addIn: '生产入库', inTitle: '生产入库',
+      part: '零件', pickPart: '选择零件', pickFirst: '请先选择零件',
+      inDate: '入库日期', inOk: '入库成功',
+      settle: '结算上月库存', settleTitle: '结算确认',
+      settleConfirm: '将 {prev} 月期末库存结转至 {month} 月期初？重复结算会覆盖已有结转值。',
+      settleOk: '已结算 {prev} 月，{n} 个零件结转至 {month} 月',
+      emptyParts: '该分类下暂无零件',
+      inTip: '每日入库直接在对应日期单元格录入；本月库存 = 上月库存 + 本月入库 − 本月出库（出库在「产线出库」页录入）',
+      need: '计划需求', outToday: '已出库', thisOut: '本次出库',
+      outBtn: '出库', outOk: '出库成功，当日累计 {n}',
+      outEmpty: '该日期暂无用料汇总（没有生产计划）',
+      outTip: '展示所选日期的用料汇总，每次录入的出库数量按日累加'
+    },
     plans: {
       alert: '库存预警：{n} 种零件库存不足，共缺 {total}',
       details: '查看详情', hide: '收起',
@@ -98,7 +115,7 @@ const messages = {
   },
   en: {
     app: { title: 'Warehouse System' },
-    menu: { records: 'Records', stocks: 'Inventory', plans: 'Production Plans', stockTake: 'Stock Take', parts: 'Parts', products: 'Products', warehouses: 'Warehouses' },
+    menu: { records: 'Records', stocks: 'Inventory', plans: 'Production Plans', stockTake: 'Stock Take', production: 'Production I/O', parts: 'Parts', products: 'Products', warehouses: 'Warehouses' },
     common: {
       search: 'Search', reset: 'Reset', save: 'Save', cancel: 'Cancel', confirm: 'OK', close: 'Close',
       edit: 'Edit', del: 'Delete', actions: 'Actions', remark: 'Remark', unit: 'Unit', category: 'Category',
@@ -155,6 +172,23 @@ const messages = {
       clearOk: 'Cleared {n} part(s)', addPart: 'Add Part', addTitle: 'Add Part',
       pickPart: 'Select part', pickFirst: 'Select a part first',
       delConfirm: 'Remove part {code}?', back: 'Back'
+    },
+    production: {
+      tabIn: 'Production In', tabOut: 'Line Out',
+      allCategories: 'All Categories', month: 'Month',
+      lastMonth: 'Last Month', current: 'This Month', day: 'D{d}',
+      addIn: 'Production In', inTitle: 'Production In',
+      part: 'Part', pickPart: 'Select part', pickFirst: 'Select a part first',
+      inDate: 'In Date', inOk: 'Inbound success',
+      settle: 'Settle Last Month', settleTitle: 'Settle Confirm',
+      settleConfirm: "Carry over {prev} closing stock into {month} opening? Re-settling overwrites existing values.",
+      settleOk: 'Settled {prev}, {n} part(s) carried into {month}',
+      emptyParts: 'No parts in this category',
+      inTip: 'Enter daily production directly in each date cell; This Month = Last Month + In - Out (record out on the Line Out tab)',
+      need: 'Plan Need', outToday: 'Out Today', thisOut: 'Out Now',
+      outBtn: 'Out', outOk: 'Outbound success, today total {n}',
+      outEmpty: 'No parts summary for this date (no plans)',
+      outTip: 'Shows the parts summary of the selected date; each entry accumulates into that day'
     },
     plans: {
       alert: 'Stock alert: {n} part(s) below demand, total shortage {total}',

@@ -8,6 +8,7 @@
           <el-menu-item :index="p('/stocks')">{{ t('menu.stocks') }}</el-menu-item>
           <el-menu-item :index="p('/plans')">{{ t('menu.plans') }}</el-menu-item>
           <el-menu-item :index="p('/stock-take')">{{ t('menu.stockTake') }}</el-menu-item>
+          <el-menu-item :index="p('/production')">{{ t('menu.production') }}</el-menu-item>
           <template v-if="isAdminArea">
             <el-menu-item :index="p('/admin/parts')">{{ t('menu.parts') }}</el-menu-item>
             <el-menu-item :index="p('/admin/products')">{{ t('menu.products') }}</el-menu-item>
@@ -40,6 +41,7 @@
             <el-menu-item :index="p('/stocks')">{{ t('menu.stocks') }}</el-menu-item>
             <el-menu-item :index="p('/plans')">{{ t('menu.plans') }}</el-menu-item>
             <el-menu-item :index="p('/stock-take')">{{ t('menu.stockTake') }}</el-menu-item>
+            <el-menu-item :index="p('/production')">{{ t('menu.production') }}</el-menu-item>
             <template v-if="isAdminArea">
               <el-menu-item :index="p('/admin/parts')">{{ t('menu.parts') }}</el-menu-item>
               <el-menu-item :index="p('/admin/products')">{{ t('menu.products') }}</el-menu-item>

@@ -88,3 +88,32 @@ CREATE TABLE IF NOT EXISTS production_plan (
   KEY idx_plan_product (product_id),
   KEY idx_plan_line_date (line, plan_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='生产计划';
+
+CREATE TABLE IF NOT EXISTS part_production_in (
+  id         BIGINT AUTO_INCREMENT PRIMARY KEY,
+  part_id    BIGINT NOT NULL COMMENT '零件id',
+  in_date    DATE   NOT NULL COMMENT '生产入库日期',
+  quantity   INT    NOT NULL COMMENT '入库数量',
+  remark     VARCHAR(255) DEFAULT '',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_pin_part_date (part_id, in_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='源头零件生产入库台账';
+
+CREATE TABLE IF NOT EXISTS part_production_out (
+  id         BIGINT AUTO_INCREMENT PRIMARY KEY,
+  part_id    BIGINT NOT NULL COMMENT '零件id',
+  out_date   DATE   NOT NULL COMMENT '产线消耗日期',
+  quantity   INT    NOT NULL COMMENT '消耗数量',
+  remark     VARCHAR(255) DEFAULT '',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_pout_part_date (part_id, out_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='尾端产线消耗台账';
+
+CREATE TABLE IF NOT EXISTS part_month_settle (
+  id          BIGINT AUTO_INCREMENT PRIMARY KEY,
+  part_id     BIGINT      NOT NULL COMMENT '零件id',
+  month_key   VARCHAR(7)  NOT NULL COMMENT '结算后的月份(YYYY-MM)，其期初=上月期末',
+  opening_qty INT         NOT NULL DEFAULT 0 COMMENT '结转期初库存',
+  settled_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_settle_part_month (part_id, month_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='生产台账月度结算';
