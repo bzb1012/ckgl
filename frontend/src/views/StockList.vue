@@ -10,6 +10,7 @@
       <el-input v-model="query.keyword" :placeholder="t('stocks.searchPh')" clearable style="width: 220px" @keyup.enter="handleSearch" @clear="handleSearch" />
       <el-button type="primary" @click="handleSearch">{{ t('common.search') }}</el-button>
       <el-button @click="resetQuery">{{ t('common.reset') }}</el-button>
+      <el-button @click="exportExcel">{{ t('stocks.exportExcel') }}</el-button>
     </div>
 
     <el-table :data="list" v-loading="loading" border stripe>
@@ -33,6 +34,7 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
+import { ElMessage } from 'element-plus'
 import warehouseApi from '../api/warehouse'
 import stockApi from '../api/stock'
 import { fmtTime } from '../utils/format'
@@ -83,6 +85,34 @@ const resetQuery = () => {
   query.page = 1
   locations.value = []
   fetch()
+}
+
+/* 导出：按零件型号合并、数量累加（遵循当前筛选条件） */
+const exportExcel = async () => {
+  const { records } = await stockApi.list({ ...query, page: 1, size: 100000 })
+  const merged = new Map()
+  for (const r of records) {
+    const key = r.partId ?? r.partCode
+    const item = merged.get(key) || { partCode: r.partCode, partName: r.partName, unit: r.unit, quantity: 0 }
+    item.quantity += r.quantity || 0
+    merged.set(key, item)
+  }
+  const rows = [...merged.values()]
+    .filter(r => r.quantity > 0)
+    .sort((a, b) => a.partCode.localeCompare(b.partCode))
+  if (!rows.length) {
+    ElMessage.warning(t('stocks.exportEmpty'))
+    return
+  }
+  const XLSX = await import('xlsx')
+  const head = [t('common.partCode'), t('common.partName'), t('common.unit'), t('stocks.stockQty')]
+  const ws = XLSX.utils.aoa_to_sheet([head, ...rows.map(r => [r.partCode, r.partName || '', r.unit || '', r.quantity])])
+  ws['!cols'] = [{ wch: 16 }, { wch: 20 }, { wch: 8 }, { wch: 12 }]
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, t('stocks.fileName').slice(0, 31))
+  const now = new Date()
+  const day = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+  XLSX.writeFile(wb, `${t('stocks.fileName')}-${day}.xlsx`)
 }
 
 onMounted(async () => {

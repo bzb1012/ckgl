@@ -61,7 +61,8 @@ const messages = {
     },
     stocks: {
       allWarehouses: '全部仓库', allLocations: '全部货位', searchPh: '零件型号/名称/货位编号',
-      locationCode: '货位编号', stockQty: '库存数量', updatedAt: '更新时间'
+      locationCode: '货位编号', stockQty: '库存数量', updatedAt: '更新时间',
+      exportExcel: '导出 Excel', fileName: '库存汇总', exportEmpty: '没有可导出的数据'
     },
     stockTake: {
       selectWarehouse: '请选择仓库', pickWarehouse: '请先选择仓库，点击货位开始盘点',
@@ -168,7 +169,8 @@ const messages = {
     },
     stocks: {
       allWarehouses: 'All Warehouses', allLocations: 'All Locations', searchPh: 'Part / name / location code',
-      locationCode: 'Location', stockQty: 'Quantity', updatedAt: 'Updated'
+      locationCode: 'Location', stockQty: 'Quantity', updatedAt: 'Updated',
+      exportExcel: 'Export Excel', fileName: 'Stock Summary', exportEmpty: 'No data to export'
     },
     stockTake: {
       selectWarehouse: 'Select warehouse', pickWarehouse: 'Select a warehouse, then click a location to start',
