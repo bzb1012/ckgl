@@ -6,8 +6,8 @@ import lombok.Data;
 @Data
 public class ProductionConfigVO {
 
-    private Integer hourlyQty;
-    private Integer lineCount;
+    private Integer intervalQty;
+    private Integer intervalMin;
     private Integer alertThreshold;
     private String barkUrl;
 }

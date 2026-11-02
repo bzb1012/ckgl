@@ -132,11 +132,11 @@
     <!-- 定时出库/预警设置 -->
     <el-dialog v-model="configVisible" :title="t('production.settingsTitle')" width="520px">
       <el-form label-width="130px">
-        <el-form-item :label="t('production.hourlyQty')">
-          <el-input-number v-model="configForm.hourlyQty" :min="1" :step="100" />
+        <el-form-item :label="t('production.intervalQty')">
+          <el-input-number v-model="configForm.intervalQty" :min="1" :step="100" />
         </el-form-item>
-        <el-form-item :label="t('production.lineCount')">
-          <el-input-number v-model="configForm.lineCount" :min="1" :max="20" />
+        <el-form-item :label="t('production.intervalMin')">
+          <el-input-number v-model="configForm.intervalMin" :min="5" :step="5" />
         </el-form-item>
         <el-form-item :label="t('production.alertThreshold')">
           <el-input-number v-model="configForm.alertThreshold" :min="0" :step="100" />
@@ -324,7 +324,7 @@ const confirmImport = async () => {
 /* ---------- 定时出库 / 预警配置 / Bark 通知 ---------- */
 const configVisible = ref(false)
 const savingConfig = ref(false)
-const configForm = ref({ hourlyQty: 2000, lineCount: 3, alertThreshold: 4000, barkUrl: '' })
+const configForm = ref({ intervalQty: 1000, intervalMin: 30, alertThreshold: 4000, barkUrl: '' })
 
 const openConfig = async () => {
   configForm.value = await productionApi.getConfig()
@@ -345,9 +345,8 @@ const saveConfig = async () => {
 /* 立即执行一轮定时出库（含库存预警检查） */
 const openAutoRun = async () => {
   const cfg = await productionApi.getConfig()
-  const summary = await productionApi.dailySummary(outDate.value)
   await ElMessageBox.confirm(
-    t('production.autoRunConfirm', { n: summary.length, qty: cfg.hourlyQty * cfg.lineCount }),
+    t('production.autoRunConfirm', { qty: cfg.intervalQty, min: cfg.intervalMin }),
     t('production.autoRun'),
     { type: 'warning', confirmButtonText: t('common.confirm'), cancelButtonText: t('common.cancel') }
   )
@@ -355,7 +354,7 @@ const openAutoRun = async () => {
   if (res.alerts && res.alerts.length) {
     ElMessageBox.alert(res.alerts.join('\n'), t('production.alertTitle'), { type: 'warning', customStyle: { whiteSpace: 'pre-line' } })
   } else {
-    ElMessage.success(t('production.autoRunOk', { n: res.parts, qty: res.perRound }))
+    ElMessage.success(t('production.autoRunOk', { n: res.plans, m: res.outKinds }))
   }
   await loadSummary()
 }

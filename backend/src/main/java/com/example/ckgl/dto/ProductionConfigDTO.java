@@ -6,11 +6,11 @@ import lombok.Data;
 @Data
 public class ProductionConfigDTO {
 
-    /** 每条线每小时每个零件的出库数量 */
-    private Integer hourlyQty;
+    /** 每条产线每个周期完成的计划产品数量 */
+    private Integer intervalQty;
 
-    /** 生产线数量 */
-    private Integer lineCount;
+    /** 执行间隔（分钟），每天 8:00~20:00 生效 */
+    private Integer intervalMin;
 
     /** 本月库存低于该值时预警 */
     private Integer alertThreshold;

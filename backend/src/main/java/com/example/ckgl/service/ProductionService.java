@@ -62,12 +62,12 @@ public class ProductionService {
 
     private static final Logger log = LoggerFactory.getLogger(ProductionService.class);
 
-    /** 配置默认值：每线每小时出 2000 × 3 条线，预警阈值 4000，Bark 未配置 */
-    private static final int DEF_HOURLY_QTY = 2000;
-    private static final int DEF_LINE_COUNT = 3;
+    /** 配置默认值：每 30 分钟每线完成 1000 个计划产品，预警阈值 4000，Bark 未配置 */
+    private static final int DEF_INTERVAL_QTY = 1000;
+    private static final int DEF_INTERVAL_MIN = 30;
     private static final int DEF_THRESHOLD = 4000;
-    private static final String KEY_HOURLY = "hourlyQty";
-    private static final String KEY_LINES = "lineCount";
+    private static final String KEY_INTERVAL_QTY = "intervalQty";
+    private static final String KEY_INTERVAL_MIN = "intervalMin";
     private static final String KEY_THRESHOLD = "alertThreshold";
     private static final String KEY_BARK = "barkUrl";
 
@@ -421,8 +421,8 @@ public class ProductionService {
     /** 读取配置（未配置项用默认值） */
     public ProductionConfigVO getConfig() {
         ProductionConfigVO vo = new ProductionConfigVO();
-        vo.setHourlyQty(getConfigInt(KEY_HOURLY, DEF_HOURLY_QTY));
-        vo.setLineCount(getConfigInt(KEY_LINES, DEF_LINE_COUNT));
+        vo.setIntervalQty(getConfigInt(KEY_INTERVAL_QTY, DEF_INTERVAL_QTY));
+        vo.setIntervalMin(getConfigInt(KEY_INTERVAL_MIN, DEF_INTERVAL_MIN));
         vo.setAlertThreshold(getConfigInt(KEY_THRESHOLD, DEF_THRESHOLD));
         vo.setBarkUrl(getConfigStr(KEY_BARK, ""));
         return vo;
@@ -431,37 +431,58 @@ public class ProductionService {
     /** 保存配置（upsert，非法值回退默认） */
     @Transactional(rollbackFor = Exception.class)
     public void updateConfig(ProductionConfigDTO dto) {
-        upsert(KEY_HOURLY, dto.getHourlyQty() == null ? String.valueOf(DEF_HOURLY_QTY)
-                : String.valueOf(Math.max(1, dto.getHourlyQty())));
-        upsert(KEY_LINES, dto.getLineCount() == null ? String.valueOf(DEF_LINE_COUNT)
-                : String.valueOf(Math.max(1, dto.getLineCount())));
+        upsert(KEY_INTERVAL_QTY, dto.getIntervalQty() == null ? String.valueOf(DEF_INTERVAL_QTY)
+                : String.valueOf(Math.max(1, dto.getIntervalQty())));
+        upsert(KEY_INTERVAL_MIN, dto.getIntervalMin() == null ? String.valueOf(DEF_INTERVAL_MIN)
+                : String.valueOf(Math.max(5, dto.getIntervalMin())));
         upsert(KEY_THRESHOLD, dto.getAlertThreshold() == null ? String.valueOf(DEF_THRESHOLD)
                 : String.valueOf(Math.max(0, dto.getAlertThreshold())));
         upsert(KEY_BARK, dto.getBarkUrl() == null ? "" : dto.getBarkUrl().trim());
     }
 
     /**
-     * 定时出库：对当天生产计划涉及的零件，按「每小时数量 × 线数」各出库一轮，
-     * 完成后检查库存预警。返回 {parts: 出库零件数, perRound: 每轮数量, alerts: 预警消息}
+     * 定时出库（按生产计划的产线计划推进）：
+     * 每条产线每个周期完成 intervalQty 个计划产品（封顶计划数量，做完自动停），
+     * 完成数量累加到计划，零件按 BOM 用量折算合并出库，完成后检查库存预警。
+     * 返回 {plans: 推进计划数, outKinds: 出库零件种类数, alerts: 预警消息}
      */
     @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> autoOut(boolean dedupeAlert) {
         LocalDate today = LocalDate.now();
-        List<ProductionOutRowVO> rows = dailySummary(today);
         ProductionConfigVO cfg = getConfig();
-        int perRound = cfg.getHourlyQty() * cfg.getLineCount();
-        for (ProductionOutRowVO row : rows) {
+
+        List<ProductionPlan> plans = productionPlanMapper.selectList(
+                new LambdaQueryWrapper<ProductionPlan>().apply("plan_date = {0}", today));
+        Map<Long, Integer> partOut = new HashMap<>();
+        int progressed = 0;
+        for (ProductionPlan plan : plans) {
+            int done = plan.getCompleted() == null ? 0 : plan.getCompleted();
+            int progress = Math.min(cfg.getIntervalQty(), plan.getQuantity() - done);
+            if (progress <= 0) {
+                continue;
+            }
+            // 本周期完成量累加到计划（封顶计划数量）
+            plan.setCompleted(done + progress);
+            plan.setUpdatedAt(java.time.LocalDateTime.now());
+            productionPlanMapper.updateById(plan);
+            progressed++;
+            // 按 BOM 用量折算零件消耗（跨计划合并）
+            for (ProductPartDetail pp : productPartMapper.selectByProductId(plan.getProductId())) {
+                partOut.merge(pp.getPartId(), pp.getQuantity() * progress, Integer::sum);
+            }
+        }
+        for (Map.Entry<Long, Integer> entry : partOut.entrySet()) {
             PartProductionOut record = new PartProductionOut();
-            record.setPartId(row.getPartId());
+            record.setPartId(entry.getKey());
             record.setOutDate(today);
-            record.setQuantity(perRound);
-            record.setRemark("定时出库(" + cfg.getLineCount() + "线)");
+            record.setQuantity(entry.getValue());
+            record.setRemark("定时出库(产线)");
             outMapper.insert(record);
         }
         List<String> alerts = checkAndAlert(cfg, dedupeAlert);
         Map<String, Object> result = new HashMap<>();
-        result.put("parts", rows.size());
-        result.put("perRound", perRound);
+        result.put("plans", progressed);
+        result.put("outKinds", partOut.size());
         result.put("alerts", alerts);
         return result;
     }
