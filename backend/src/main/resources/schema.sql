@@ -117,3 +117,8 @@ CREATE TABLE IF NOT EXISTS part_month_settle (
   settled_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY uk_settle_part_month (part_id, month_key)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='生产台账月度结算';
+
+CREATE TABLE IF NOT EXISTS production_config (
+  config_key   VARCHAR(64)  PRIMARY KEY,
+  config_value VARCHAR(512) NOT NULL DEFAULT '' COMMENT '配置值'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='生产出入库配置(每小时出库量/线数/预警阈值/Bark地址)';

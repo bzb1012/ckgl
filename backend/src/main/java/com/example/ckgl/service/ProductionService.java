@@ -4,6 +4,10 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.example.ckgl.common.BusinessException;
 import com.example.ckgl.dto.ProductPartDetail;
+import com.example.ckgl.dto.OpeningImportDTO;
+import com.example.ckgl.dto.OpeningImportVO;
+import com.example.ckgl.dto.ProductionConfigDTO;
+import com.example.ckgl.dto.ProductionConfigVO;
 import com.example.ckgl.dto.ProductionEntryDTO;
 import com.example.ckgl.dto.ProductionLedgerItemVO;
 import com.example.ckgl.dto.ProductionLedgerVO;
@@ -13,16 +17,28 @@ import com.example.ckgl.entity.Part;
 import com.example.ckgl.entity.PartMonthSettle;
 import com.example.ckgl.entity.PartProductionIn;
 import com.example.ckgl.entity.PartProductionOut;
+import com.example.ckgl.entity.ProductionConfig;
 import com.example.ckgl.entity.ProductionPlan;
 import com.example.ckgl.mapper.PartMapper;
 import com.example.ckgl.mapper.PartMonthSettleMapper;
 import com.example.ckgl.mapper.PartProductionInMapper;
 import com.example.ckgl.mapper.PartProductionOutMapper;
 import com.example.ckgl.mapper.ProductPartMapper;
+import com.example.ckgl.mapper.ProductionConfigMapper;
 import com.example.ckgl.mapper.ProductionPlanMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.net.URI;
+import java.net.URLEncoder;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 
 import java.time.LocalDate;
 import java.time.YearMonth;
@@ -35,6 +51,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 生产出入库台账：源头零件生产入库、尾端产线消耗、月度结算结转。
@@ -42,6 +59,20 @@ import java.util.Set;
  */
 @Service
 public class ProductionService {
+
+    private static final Logger log = LoggerFactory.getLogger(ProductionService.class);
+
+    /** 配置默认值：每线每小时出 2000 × 3 条线，预警阈值 4000，Bark 未配置 */
+    private static final int DEF_HOURLY_QTY = 2000;
+    private static final int DEF_LINE_COUNT = 3;
+    private static final int DEF_THRESHOLD = 4000;
+    private static final String KEY_HOURLY = "hourlyQty";
+    private static final String KEY_LINES = "lineCount";
+    private static final String KEY_THRESHOLD = "alertThreshold";
+    private static final String KEY_BARK = "barkUrl";
+
+    /** 预警去重：同一天同一零件只推送一次（定时任务用，重启后重置） */
+    private static final Set<String> ALERTED_TODAY = ConcurrentHashMap.newKeySet();
 
     @Autowired
     private PartMapper partMapper;
@@ -55,6 +86,8 @@ public class ProductionService {
     private PartProductionOutMapper outMapper;
     @Autowired
     private PartMonthSettleMapper settleMapper;
+    @Autowired
+    private ProductionConfigMapper configMapper;
 
     /** 某月的台账表格：按分类取零件，返回上月库存、本月库存与每日消耗 */
     public ProductionLedgerVO ledger(String category, String month) {
@@ -337,6 +370,195 @@ public class ProductionService {
             settleMapper.insert(settle);
         }
         return parts.size();
+    }
+
+    /**
+     * 导入覆盖所选月份的上月库存（期初）：按零件型号匹配，
+     * 匹配到的写/覆盖 part_month_settle，未匹配的型号在结果中返回。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public OpeningImportVO importOpening(OpeningImportDTO dto) {
+        YearMonth ym = parseMonth(dto.getMonth());
+        String monthKey = ym.toString();
+
+        Map<String, Part> byCode = new HashMap<>();
+        for (Part part : partMapper.selectList(null)) {
+            byCode.put(part.getCode(), part);
+        }
+
+        OpeningImportVO vo = new OpeningImportVO();
+        for (OpeningImportDTO.Row row : dto.getItems()) {
+            String code = row.getPartCode() == null ? "" : row.getPartCode().trim();
+            if (code.isEmpty()) {
+                continue;
+            }
+            Part part = byCode.get(code);
+            if (part == null) {
+                vo.getNotFound().add(code);
+                continue;
+            }
+            int qty = row.getQuantity() == null ? 0 : Math.max(0, row.getQuantity());
+            PartMonthSettle settle = settleMapper.selectOne(new LambdaQueryWrapper<PartMonthSettle>()
+                    .eq(PartMonthSettle::getMonthKey, monthKey)
+                    .eq(PartMonthSettle::getPartId, part.getId()));
+            if (settle == null) {
+                settle = new PartMonthSettle();
+                settle.setPartId(part.getId());
+                settle.setMonthKey(monthKey);
+                settle.setOpeningQty(qty);
+                settleMapper.insert(settle);
+            } else {
+                settle.setOpeningQty(qty);
+                settleMapper.updateById(settle);
+            }
+            vo.setUpdated(vo.getUpdated() + 1);
+        }
+        return vo;
+    }
+
+    /* ==================== 定时出库 + 库存预警 + Bark 通知 ==================== */
+
+    /** 读取配置（未配置项用默认值） */
+    public ProductionConfigVO getConfig() {
+        ProductionConfigVO vo = new ProductionConfigVO();
+        vo.setHourlyQty(getConfigInt(KEY_HOURLY, DEF_HOURLY_QTY));
+        vo.setLineCount(getConfigInt(KEY_LINES, DEF_LINE_COUNT));
+        vo.setAlertThreshold(getConfigInt(KEY_THRESHOLD, DEF_THRESHOLD));
+        vo.setBarkUrl(getConfigStr(KEY_BARK, ""));
+        return vo;
+    }
+
+    /** 保存配置（upsert，非法值回退默认） */
+    @Transactional(rollbackFor = Exception.class)
+    public void updateConfig(ProductionConfigDTO dto) {
+        upsert(KEY_HOURLY, dto.getHourlyQty() == null ? String.valueOf(DEF_HOURLY_QTY)
+                : String.valueOf(Math.max(1, dto.getHourlyQty())));
+        upsert(KEY_LINES, dto.getLineCount() == null ? String.valueOf(DEF_LINE_COUNT)
+                : String.valueOf(Math.max(1, dto.getLineCount())));
+        upsert(KEY_THRESHOLD, dto.getAlertThreshold() == null ? String.valueOf(DEF_THRESHOLD)
+                : String.valueOf(Math.max(0, dto.getAlertThreshold())));
+        upsert(KEY_BARK, dto.getBarkUrl() == null ? "" : dto.getBarkUrl().trim());
+    }
+
+    /**
+     * 定时出库：对当天生产计划涉及的零件，按「每小时数量 × 线数」各出库一轮，
+     * 完成后检查库存预警。返回 {parts: 出库零件数, perRound: 每轮数量, alerts: 预警消息}
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public Map<String, Object> autoOut(boolean dedupeAlert) {
+        LocalDate today = LocalDate.now();
+        List<ProductionOutRowVO> rows = dailySummary(today);
+        ProductionConfigVO cfg = getConfig();
+        int perRound = cfg.getHourlyQty() * cfg.getLineCount();
+        for (ProductionOutRowVO row : rows) {
+            PartProductionOut record = new PartProductionOut();
+            record.setPartId(row.getPartId());
+            record.setOutDate(today);
+            record.setQuantity(perRound);
+            record.setRemark("定时出库(" + cfg.getLineCount() + "线)");
+            outMapper.insert(record);
+        }
+        List<String> alerts = checkAndAlert(cfg, dedupeAlert);
+        Map<String, Object> result = new HashMap<>();
+        result.put("parts", rows.size());
+        result.put("perRound", perRound);
+        result.put("alerts", alerts);
+        return result;
+    }
+
+    /**
+     * 库存预警：当天计划需要的零件中，本月库存低于阈值的收集为消息并合并推送 Bark。
+     * dedupe=true 时同一天同一零件只推送一次。
+     */
+    public List<String> checkAndAlert(ProductionConfigVO cfg, boolean dedupe) {
+        LocalDate today = LocalDate.now();
+        List<ProductionOutRowVO> rows = dailySummary(today);
+        List<String> alerts = new ArrayList<>();
+        if (rows.isEmpty()) {
+            return alerts;
+        }
+        // 本月库存（current = 上月库存 + 本月入库 − 本月出库）
+        ProductionLedgerVO ledger = ledger(null, YearMonth.now().toString());
+        Map<Long, Integer> currentMap = new HashMap<>();
+        for (ProductionLedgerItemVO item : ledger.getItems()) {
+            currentMap.put(item.getPartId(), item.getCurrent());
+        }
+        for (ProductionOutRowVO row : rows) {
+            if (dedupe && !ALERTED_TODAY.add(today + ":" + row.getPartId())) {
+                continue;
+            }
+            int current = currentMap.getOrDefault(row.getPartId(), 0);
+            if (current < cfg.getAlertThreshold()) {
+                alerts.add(row.getPartCode() + " 本月库存 " + current + "，今日需 " + row.getTotalNeed()
+                        + "，缺 " + Math.max(0, row.getTotalNeed() - current));
+            }
+        }
+        if (!alerts.isEmpty()) {
+            String body = String.join("；", alerts);
+            boolean sent = sendBark("生产库存预警", body);
+            log.info("库存预警 {}: sent={}, {}", today, sent, body);
+        }
+        return alerts;
+    }
+
+    /** 发送 Bark 测试通知，返回结果消息 */
+    public String testBark() {
+        String base = getConfigStr(KEY_BARK, "");
+        if (base.isBlank()) {
+            return "未配置 Bark 推送地址";
+        }
+        return sendBark("仓库管理系统", "Bark 通知测试成功") ? "发送成功，请查看手机通知"
+                : "发送失败，请检查 Bark 地址";
+    }
+
+    /** Bark 推送：GET {barkUrl}/{title}/{body}，失败仅记日志不影响业务 */
+    private boolean sendBark(String title, String body) {
+        String base = getConfigStr(KEY_BARK, "");
+        if (base.isBlank()) {
+            return false;
+        }
+        String url = (base.endsWith("/") ? base : base + "/")
+                + URLEncoder.encode(title, StandardCharsets.UTF_8) + "/"
+                + URLEncoder.encode(body, StandardCharsets.UTF_8);
+        try {
+            HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
+            HttpRequest request = HttpRequest.newBuilder(URI.create(url))
+                    .timeout(Duration.ofSeconds(5))
+                    .header("Accept", "application/json")
+                    .GET().build();
+            HttpResponse<String> resp = client.send(request, HttpResponse.BodyHandlers.ofString());
+            return resp.statusCode() == 200;
+        } catch (Exception e) {
+            log.warn("Bark 推送失败: {}", e.getMessage());
+            return false;
+        }
+    }
+
+    private int getConfigInt(String key, int def) {
+        String val = getConfigStr(key, null);
+        try {
+            return val == null ? def : Integer.parseInt(val.trim());
+        } catch (NumberFormatException e) {
+            return def;
+        }
+    }
+
+    private String getConfigStr(String key, String def) {
+        ProductionConfig row = configMapper.selectById(key);
+        return row == null || row.getConfigValue() == null ? def : row.getConfigValue();
+    }
+
+    private void upsert(String key, String value) {
+        ProductionConfig row = configMapper.selectById(key);
+        if (row == null) {
+            row = new ProductionConfig();
+            row.setConfigKey(key);
+            row.setConfigValue(value);
+            configMapper.insert(row);
+        } else {
+            row.setConfigValue(value);
+            configMapper.updateById(row);
+        }
     }
 
     /** 按零件汇总入库数量，[from, to) */

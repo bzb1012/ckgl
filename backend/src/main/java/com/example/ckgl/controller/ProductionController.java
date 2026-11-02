@@ -1,6 +1,10 @@
 package com.example.ckgl.controller;
 
 import com.example.ckgl.common.Result;
+import com.example.ckgl.dto.OpeningImportDTO;
+import com.example.ckgl.dto.OpeningImportVO;
+import com.example.ckgl.dto.ProductionConfigDTO;
+import com.example.ckgl.dto.ProductionConfigVO;
 import com.example.ckgl.dto.ProductionDayInDTO;
 import com.example.ckgl.dto.ProductionEntryDTO;
 import com.example.ckgl.dto.ProductionLedgerVO;
@@ -21,6 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 /** 生产出入库：源头零件生产入库、尾端产线消耗、月度结算 */
 @RestController
@@ -71,6 +76,37 @@ public class ProductionController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate start,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate end) {
         return Result.ok(productionService.outExport(start, end));
+    }
+
+    /** 导入覆盖所选月份的上月库存，返回覆盖数与未匹配型号 */
+    @PostMapping("/opening-import")
+    public Result<OpeningImportVO> importOpening(@Valid @RequestBody OpeningImportDTO dto) {
+        return Result.ok(productionService.importOpening(dto));
+    }
+
+    /** 读取定时出库/预警配置 */
+    @GetMapping("/config")
+    public Result<ProductionConfigVO> getConfig() {
+        return Result.ok(productionService.getConfig());
+    }
+
+    /** 保存定时出库/预警配置 */
+    @PutMapping("/config")
+    public Result<Void> updateConfig(@RequestBody ProductionConfigDTO dto) {
+        productionService.updateConfig(dto);
+        return Result.ok();
+    }
+
+    /** 手动立即执行一轮定时出库（含库存预警检查，不去重） */
+    @PostMapping("/auto-out/run")
+    public Result<Map<String, Object>> runAutoOut() {
+        return Result.ok(productionService.autoOut(false));
+    }
+
+    /** 发送 Bark 测试通知，返回结果消息 */
+    @PostMapping("/alert/test")
+    public Result<String> testAlert() {
+        return Result.ok(productionService.testBark());
     }
 
     /** 结算上月库存到所选月份期初，返回零件数 */
