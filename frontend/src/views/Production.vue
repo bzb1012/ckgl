@@ -353,8 +353,10 @@ const openAutoRun = async () => {
   const res = await productionApi.runAutoOut()
   if (res.alerts && res.alerts.length) {
     ElMessageBox.alert(res.alerts.join('\n'), t('production.alertTitle'), { type: 'warning', customStyle: { whiteSpace: 'pre-line' } })
+  } else if (!res.plans) {
+    ElMessage.warning(t('production.autoRunNone'))
   } else {
-    ElMessage.success(t('production.autoRunOk', { n: res.plans, m: res.outKinds }))
+    ElMessage.success(t('production.autoRunOk', { line: res.line, n: res.plans, m: res.outKinds }))
   }
   await loadSummary()
 }

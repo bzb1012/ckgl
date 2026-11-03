@@ -97,10 +97,10 @@ public class ProductionController {
         return Result.ok();
     }
 
-    /** 手动立即执行一轮定时出库（含库存预警检查，不去重） */
+    /** 手动立即执行一轮定时出库（含库存预警检查，每次都会推送） */
     @PostMapping("/auto-out/run")
     public Result<Map<String, Object>> runAutoOut() {
-        return Result.ok(productionService.autoOut(false));
+        return Result.ok(productionService.autoOut());
     }
 
     /** 发送 Bark 测试通知，返回结果消息 */

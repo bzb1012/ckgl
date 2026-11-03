@@ -51,7 +51,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 生产出入库台账：源头零件生产入库、尾端产线消耗、月度结算结转。
@@ -70,9 +69,6 @@ public class ProductionService {
     private static final String KEY_INTERVAL_MIN = "intervalMin";
     private static final String KEY_THRESHOLD = "alertThreshold";
     private static final String KEY_BARK = "barkUrl";
-
-    /** 预警去重：同一天同一零件只推送一次（定时任务用，重启后重置） */
-    private static final Set<String> ALERTED_TODAY = ConcurrentHashMap.newKeySet();
 
     @Autowired
     private PartMapper partMapper;
@@ -441,34 +437,52 @@ public class ProductionService {
     }
 
     /**
-     * 定时出库（按生产计划的产线计划推进）：
-     * 每条产线每个周期完成 intervalQty 个计划产品（封顶计划数量，做完自动停），
-     * 完成数量累加到计划，零件按 BOM 用量折算合并出库，完成后检查库存预警。
-     * 返回 {plans: 推进计划数, outKinds: 出库零件种类数, alerts: 预警消息}
+     * 定时出库（按生产计划顺序逐条产线推进）：
+     * 每次只推进计划顺序中最靠前、仍有未完成计划的那一条产线，
+     * 该线的未完成计划各完成 intervalQty 个（封顶计划数量，做完自动切到下一条产线），
+     * 零件按 BOM 用量折算合并出库，完成后检查库存预警。
+     * 返回 {plans: 推进计划数, line: 本次推进的产线, outKinds: 出库零件种类数, alerts: 预警消息}
      */
     @Transactional(rollbackFor = Exception.class)
-    public Map<String, Object> autoOut(boolean dedupeAlert) {
+    public Map<String, Object> autoOut() {
         LocalDate today = LocalDate.now();
         ProductionConfigVO cfg = getConfig();
 
         List<ProductionPlan> plans = productionPlanMapper.selectList(
-                new LambdaQueryWrapper<ProductionPlan>().apply("plan_date = {0}", today));
+                new LambdaQueryWrapper<ProductionPlan>()
+                        .apply("plan_date = {0}", today)
+                        .orderByAsc(ProductionPlan::getId));
         Map<Long, Integer> partOut = new HashMap<>();
         int progressed = 0;
-        for (ProductionPlan plan : plans) {
-            int done = plan.getCompleted() == null ? 0 : plan.getCompleted();
-            int progress = Math.min(cfg.getIntervalQty(), plan.getQuantity() - done);
-            if (progress <= 0) {
-                continue;
+        String currentLine = null;
+        // 按计划顺序定位第一条还有未完成计划的产线
+        for (ProductionPlan p : plans) {
+            int done = p.getCompleted() == null ? 0 : p.getCompleted();
+            if (p.getQuantity() != null && done < p.getQuantity()) {
+                currentLine = p.getLine();
+                break;
             }
-            // 本周期完成量累加到计划（封顶计划数量）
-            plan.setCompleted(done + progress);
-            plan.setUpdatedAt(java.time.LocalDateTime.now());
-            productionPlanMapper.updateById(plan);
-            progressed++;
-            // 按 BOM 用量折算零件消耗（跨计划合并）
-            for (ProductPartDetail pp : productPartMapper.selectByProductId(plan.getProductId())) {
-                partOut.merge(pp.getPartId(), pp.getQuantity() * progress, Integer::sum);
+        }
+        if (currentLine != null) {
+            // 只推进这一条产线，其他产线本周期不动
+            for (ProductionPlan plan : plans) {
+                if (!java.util.Objects.equals(plan.getLine(), currentLine)) {
+                    continue;
+                }
+                int done = plan.getCompleted() == null ? 0 : plan.getCompleted();
+                int progress = Math.min(cfg.getIntervalQty(), plan.getQuantity() - done);
+                if (progress <= 0) {
+                    continue;
+                }
+                // 本周期完成量累加到计划（封顶计划数量）
+                plan.setCompleted(done + progress);
+                plan.setUpdatedAt(java.time.LocalDateTime.now());
+                productionPlanMapper.updateById(plan);
+                progressed++;
+                // 按 BOM 用量折算零件消耗（跨计划合并）
+                for (ProductPartDetail pp : productPartMapper.selectByProductId(plan.getProductId())) {
+                    partOut.merge(pp.getPartId(), pp.getQuantity() * progress, Integer::sum);
+                }
             }
         }
         for (Map.Entry<Long, Integer> entry : partOut.entrySet()) {
@@ -479,9 +493,10 @@ public class ProductionService {
             record.setRemark("定时出库(产线)");
             outMapper.insert(record);
         }
-        List<String> alerts = checkAndAlert(cfg, dedupeAlert);
+        List<String> alerts = checkAndAlert(cfg);
         Map<String, Object> result = new HashMap<>();
         result.put("plans", progressed);
+        result.put("line", currentLine == null ? "" : currentLine);
         result.put("outKinds", partOut.size());
         result.put("alerts", alerts);
         return result;
@@ -489,9 +504,9 @@ public class ProductionService {
 
     /**
      * 库存预警：当天计划需要的零件中，本月库存低于阈值的收集为消息并合并推送 Bark。
-     * dedupe=true 时同一天同一零件只推送一次。
+     * 每次检查都会提醒（不做去重）。
      */
-    public List<String> checkAndAlert(ProductionConfigVO cfg, boolean dedupe) {
+    public List<String> checkAndAlert(ProductionConfigVO cfg) {
         LocalDate today = LocalDate.now();
         List<ProductionOutRowVO> rows = dailySummary(today);
         List<String> alerts = new ArrayList<>();
@@ -505,9 +520,6 @@ public class ProductionService {
             currentMap.put(item.getPartId(), item.getCurrent());
         }
         for (ProductionOutRowVO row : rows) {
-            if (dedupe && !ALERTED_TODAY.add(today + ":" + row.getPartId())) {
-                continue;
-            }
             int current = currentMap.getOrDefault(row.getPartId(), 0);
             if (current < cfg.getAlertThreshold()) {
                 alerts.add(row.getPartCode() + " 本月库存 " + current + "，今日需 " + row.getTotalNeed()
