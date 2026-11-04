@@ -6,6 +6,7 @@ export default {
   alerts: () => request.get('/plans/alerts'),
   todayParts: date => request.get('/plans/today-parts', { params: { date } }),
   create: data => request.post('/plans', data),
+  importPlans: items => request.post('/plans/import', items),
   update: (id, data) => request.put(`/plans/${id}`, data),
   updateCompleted: (id, completed) => request.put(`/plans/${id}/completed`, { completed }),
   remove: id => request.delete(`/plans/${id}`)

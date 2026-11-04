@@ -41,6 +41,7 @@
       <el-checkbox v-model="onlyUndone" @change="handleSearch">{{ t('plans.onlyUndone') }}</el-checkbox>
       <div class="spacer"></div>
       <el-button type="warning" @click="openTodayParts">{{ t('plans.todayParts') }}</el-button>
+      <el-button @click="openImport">{{ t('plans.import') }}</el-button>
       <el-button type="success" @click="openCreate">{{ t('plans.add') }}</el-button>
     </div>
 
@@ -114,6 +115,55 @@
       </el-table>
       <div v-if="!todayLoading && !todayList.length" class="detail-tip">{{ t('plans.todayEmpty') }}</div>
       <div class="detail-tip">{{ t('plans.todayTip') }}</div>
+    </el-dialog>
+
+    <!-- 导入计划（每日计划 Excel） -->
+    <el-dialog v-model="importVisible" :title="t('plans.importTitle')" width="980px">
+      <div class="import-bar">
+        <el-button @click="fileInput.click()">{{ t('plans.chooseFile') }}</el-button>
+        <input ref="fileInput" type="file" accept=".xlsx,.xls" style="display: none" @change="onFileChange" />
+        <span class="import-file">{{ importFileName || t('plans.noFile') }}</span>
+        <div class="spacer"></div>
+        <span class="import-count">{{ t('plans.importMatched', { ok: importMatchedCount, total: importRows.length }) }}</span>
+      </div>
+      <el-table v-loading="importParsing" :data="importRows" border size="small" max-height="380">
+        <el-table-column prop="line" :label="t('plans.line')" width="70" align="center" />
+        <el-table-column prop="planDate" :label="t('plans.planDate')" width="105" />
+        <el-table-column prop="drawNo" :label="t('plans.drawNo')" min-width="160" show-overflow-tooltip />
+        <el-table-column prop="custModel" :label="t('plans.custModel')" min-width="110" show-overflow-tooltip />
+        <el-table-column :label="t('plans.planQty')" width="120">
+          <template #default="{ row }">
+            <el-input-number v-model="row.quantity" :min="1" size="small" style="width: 100%" />
+          </template>
+        </el-table-column>
+        <el-table-column :label="t('plans.product')" min-width="200">
+          <template #default="{ row }">
+            <el-select v-model="row.productId" filterable clearable size="small" style="width: 100%"
+              :placeholder="t('plans.pickProduct')">
+              <el-option v-for="p in products" :key="p.id" :label="`${p.code} / ${p.name}`" :value="p.id" />
+            </el-select>
+          </template>
+        </el-table-column>
+        <el-table-column :label="t('plans.status')" width="80" align="center">
+          <template #default="{ row }">
+            <el-tag :type="row.productId ? 'success' : 'danger'" size="small">
+              {{ row.productId ? t('plans.matched') : t('plans.unmatched') }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column :label="t('common.actions')" width="70" align="center">
+          <template #default="{ $index }">
+            <el-button link type="danger" @click="importRows.splice($index, 1)">{{ t('common.del') }}</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <div class="detail-tip">{{ t('plans.importTip') }}</div>
+      <template #footer>
+        <el-button @click="importVisible = false">{{ t('common.cancel') }}</el-button>
+        <el-button type="primary" :loading="importing" :disabled="!importMatchedCount" @click="doImport">
+          {{ t('plans.importConfirm', { n: importMatchedCount }) }}
+        </el-button>
+      </template>
     </el-dialog>
 
     <!-- 新增/编辑计划 -->
@@ -365,6 +415,126 @@ const handleDelete = async row => {
   fetchAlerts()
 }
 
+// ---- 导入计划（每日计划 Excel） ----
+const importVisible = ref(false)
+const importRows = ref([])
+const importFileName = ref('')
+const importParsing = ref(false)
+const importing = ref(false)
+const fileInput = ref(null)
+const importMatchedCount = computed(() => importRows.value.filter(r => r.productId).length)
+
+const pad2 = n => String(n).padStart(2, '0')
+const norm = v => String(v ?? '').trim().toUpperCase().replace(/\s+/g, '')
+
+/** 产品索引：编码 / 名称 归一化后匹配 */
+const productIndex = computed(() => {
+  const map = new Map()
+  for (const p of products.value) {
+    if (p.code) map.set(norm(p.code), p.id)
+    if (p.name) map.set(norm(p.name), p.id)
+  }
+  return map
+})
+
+/** Excel 日期：数字为序列号，文本支持 2026-11-04 / 11-04 等写法 */
+const excelDate = v => {
+  if (v === null || v === undefined || v === '') return ''
+  if (typeof v === 'number') {
+    const d = new Date(Date.UTC(1899, 11, 30) + Math.round(v) * 86400000)
+    return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`
+  }
+  const s = String(v).trim()
+  const full = s.match(/(\d{4})[-/.年](\d{1,2})[-/.月](\d{1,2})/)
+  if (full) return `${full[1]}-${pad2(full[2])}-${pad2(full[3])}`
+  const short = s.match(/(\d{1,2})[-/.月](\d{1,2})/)
+  return short ? `${new Date().getFullYear()}-${pad2(short[1])}-${pad2(short[2])}` : ''
+}
+
+/** 工作表名 LINE 1 → 1线 */
+const lineFromSheet = name => {
+  const m = String(name).match(/(\d+)/)
+  return m ? `${Number(m[1])}线` : ''
+}
+
+const loadProducts = async () => {
+  if (products.value.length) return
+  const data = await productApi.list({ page: 1, size: 100 })
+  products.value = data.records
+}
+
+const openImport = async () => {
+  await loadProducts()
+  importRows.value = []
+  importFileName.value = ''
+  if (fileInput.value) fileInput.value.value = ''
+  importVisible.value = true
+}
+
+const onFileChange = async e => {
+  const file = e.target.files && e.target.files[0]
+  if (!file) return
+  importParsing.value = true
+  try {
+    const XLSX = await import('xlsx')
+    const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' })
+    const rows = []
+    for (const name of wb.SheetNames) {
+      const line = lineFromSheet(name)
+      if (!line) continue
+      const aoa = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, defval: '', raw: true })
+      const hIndex = aoa.findIndex(r => r.some(c => String(c).includes('计划生产数量')))
+      if (hIndex < 0) continue
+      const header = aoa[hIndex].map(c => String(c).trim())
+      const col = key => header.findIndex(h => h.includes(key))
+      const iDraw = col('图纸号')
+      const iModel = col('客户型号')
+      const iQty = col('计划生产数量')
+      const iDate = col('计划生产日期')
+      for (let i = hIndex + 1; i < aoa.length; i++) {
+        const r = aoa[i]
+        const rowHead = String(r[0] ?? '')
+        if (rowHead.includes('合计') || rowHead.includes('总计')) continue
+        const drawNo = String(r[iDraw] ?? '').trim()
+        const quantity = Number(r[iQty])
+        const planDate = excelDate(r[iDate])
+        if (!drawNo || !(quantity > 0) || !planDate) continue
+        const custModel = String(r[iModel] ?? '').trim()
+        const productId = productIndex.value.get(norm(drawNo)) || productIndex.value.get(norm(custModel)) || null
+        rows.push({ line, planDate, drawNo, custModel, quantity, productId })
+      }
+    }
+    importRows.value = rows
+    importFileName.value = file.name
+    if (!rows.length) ElMessage.warning(t('plans.importEmpty'))
+  } catch (err) {
+    ElMessage.error(t('plans.importEmpty'))
+  } finally {
+    importParsing.value = false
+    e.target.value = ''
+  }
+}
+
+/** 只导入已匹配（或手动选择产品）的行；后端按「产线 + 日期」覆盖原有计划 */
+const doImport = async () => {
+  const items = importRows.value
+    .filter(r => r.productId && r.quantity > 0 && r.planDate)
+    .map(r => ({ planDate: r.planDate, line: r.line, productId: r.productId, quantity: r.quantity, remark: r.custModel }))
+  if (!items.length) return
+  importing.value = true
+  try {
+    const res = await planApi.importPlans(items)
+    ElMessage.success(t('plans.importOk', { n: res.imported, r: res.replaced }))
+    importVisible.value = false
+    query.page = 1
+    fetch()
+    fetchAlerts()
+    fetchLines()
+  } finally {
+    importing.value = false
+  }
+}
+
 onMounted(() => {
   fetch()
   fetchAlerts()
@@ -416,6 +586,19 @@ onMounted(() => {
 }
 .alert-table {
   margin-bottom: 14px;
+}
+.import-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+.import-file {
+  color: #909399;
+}
+.import-count {
+  color: #606266;
 }
 .lack {
   color: #f56c6c;

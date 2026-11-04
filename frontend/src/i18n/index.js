@@ -132,7 +132,16 @@ const messages = {
       totalNeed: '需求总数', completedNeed: '已完成计划需求',
       todayEmpty: '该日期暂无生产计划',
       todayTip: '统计所选日期全部计划的计划需求（按计划数量，不受已完成数量影响）；「已完成计划需求」为其中已完成计划的需求，相同零件已合并累加',
-      completedOk: '已更新完成数量', delConfirm: '确定删除该计划吗？'
+      completedOk: '已更新完成数量', delConfirm: '确定删除该计划吗？',
+      import: '导入计划', importTitle: '导入计划（每日计划 Excel）',
+      chooseFile: '选择文件', noFile: '未选择文件',
+      importMatched: '已匹配 {ok} / {total} 行',
+      drawNo: '图纸号', custModel: '客户型号', matched: '已匹配', unmatched: '未匹配',
+      pickProduct: '选择产品',
+      importTip: '按工作表名 LINE 1/2/3 识别产线；「合计」行自动跳过。导入将覆盖所选产线与日期原有的计划，未匹配产品的行不会被导入，可在表格中手动选择产品。',
+      importConfirm: '覆盖导入 {n} 条',
+      importOk: '导入完成：新增 {n} 条，覆盖原有 {r} 条',
+      importEmpty: '未解析到有效数据，请检查文件格式'
     }
   },
   en: {
@@ -256,7 +265,16 @@ const messages = {
       totalNeed: 'Total Need', completedNeed: 'Completed Plan Need',
       todayEmpty: 'No plans on this date',
       todayTip: 'Sums the planned demand of all plans on the selected date (full planned qty, completion ignored); "Completed Plan Need" is the portion from completed plans, same parts merged',
-      completedOk: 'Completed updated', delConfirm: 'Delete this plan?'
+      completedOk: 'Completed updated', delConfirm: 'Delete this plan?',
+      import: 'Import Plans', importTitle: 'Import Plans (Daily Plan Excel)',
+      chooseFile: 'Choose File', noFile: 'No file selected',
+      importMatched: 'Matched {ok} / {total} rows',
+      drawNo: 'Drawing No.', custModel: 'Customer Model', matched: 'Matched', unmatched: 'Unmatched',
+      pickProduct: 'Select product',
+      importTip: 'Lines are detected from sheet names LINE 1/2/3; "Total" rows are skipped. Import overwrites existing plans of the same line and date. Rows without a matched product are skipped — you can pick a product manually.',
+      importConfirm: 'Import {n} rows (overwrite)',
+      importOk: 'Imported {n} rows, replaced {r} existing',
+      importEmpty: 'No valid data parsed, please check the file'
     }
   }
 }

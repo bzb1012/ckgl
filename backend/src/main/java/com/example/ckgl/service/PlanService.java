@@ -9,6 +9,7 @@ import com.example.ckgl.common.BusinessException;
 import com.example.ckgl.dto.PlanAlertVO;
 import com.example.ckgl.dto.PlanCompletedDTO;
 import com.example.ckgl.dto.PlanDTO;
+import com.example.ckgl.dto.PlanImportItemDTO;
 import com.example.ckgl.dto.PlanPartVO;
 import com.example.ckgl.dto.PlanVO;
 import com.example.ckgl.dto.ProductPartDetail;
@@ -24,6 +25,7 @@ import com.example.ckgl.mapper.ProductPartMapper;
 import com.example.ckgl.mapper.StockMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -276,6 +278,55 @@ public class PlanService extends ServiceImpl<ProductionPlanMapper, ProductionPla
             throw new BusinessException("计划不存在");
         }
         this.removeById(id);
+    }
+
+    /**
+     * 导入计划：按导入数据覆盖原有数据——先删除导入涉及的「产线 + 计划日期」下的全部计划，
+     * 再写入新计划。返回 {imported: 导入条数, replaced: 被覆盖删除的条数}
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public Map<String, Object> importPlans(List<PlanImportItemDTO> items) {
+        if (items == null || items.isEmpty()) {
+            throw new BusinessException("导入数据为空");
+        }
+        Set<Long> productIds = new HashSet<>();
+        for (PlanImportItemDTO item : items) {
+            if (item.getPlanDate() == null || item.getLine() == null || item.getLine().isBlank()
+                    || item.getProductId() == null || item.getQuantity() == null || item.getQuantity() < 1) {
+                throw new BusinessException("导入数据不完整，请检查产线、日期、产品和数量");
+            }
+            productIds.add(item.getProductId());
+        }
+        if (productMapper.selectBatchIds(productIds).size() != productIds.size()) {
+            throw new BusinessException("存在未匹配的产品，请先在产品管理中维护");
+        }
+
+        // 覆盖：按「产线 + 日期」删除原有计划
+        Map<String, Set<LocalDate>> targets = new HashMap<>();
+        for (PlanImportItemDTO item : items) {
+            targets.computeIfAbsent(item.getLine().trim(), k -> new HashSet<>()).add(item.getPlanDate());
+        }
+        int replaced = 0;
+        for (Map.Entry<String, Set<LocalDate>> entry : targets.entrySet()) {
+            replaced += this.baseMapper.delete(new LambdaQueryWrapper<ProductionPlan>()
+                    .eq(ProductionPlan::getLine, entry.getKey())
+                    .in(ProductionPlan::getPlanDate, entry.getValue()));
+        }
+
+        for (PlanImportItemDTO item : items) {
+            ProductionPlan plan = new ProductionPlan();
+            plan.setPlanDate(item.getPlanDate());
+            plan.setLine(item.getLine().trim());
+            plan.setProductId(item.getProductId());
+            plan.setQuantity(item.getQuantity());
+            plan.setCompleted(0);
+            plan.setRemark(item.getRemark());
+            this.save(plan);
+        }
+        Map<String, Object> result = new HashMap<>();
+        result.put("imported", items.size());
+        result.put("replaced", replaced);
+        return result;
     }
 
     /** 全部未完成计划的零件总需求：Σ(计划数量-已完成)×单件用量 */

@@ -5,6 +5,7 @@ import com.example.ckgl.common.Result;
 import com.example.ckgl.dto.PlanAlertVO;
 import com.example.ckgl.dto.PlanCompletedDTO;
 import com.example.ckgl.dto.PlanDTO;
+import com.example.ckgl.dto.PlanImportItemDTO;
 import com.example.ckgl.dto.PlanVO;
 import com.example.ckgl.dto.TodayPartVO;
 import com.example.ckgl.entity.ProductionPlan;
@@ -24,6 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/plans")
@@ -62,6 +64,12 @@ public class PlanController {
     @PostMapping
     public Result<ProductionPlan> create(@Valid @RequestBody PlanDTO dto) {
         return Result.ok(planService.create(dto));
+    }
+
+    /** 导入计划：覆盖导入涉及产线与日期的原有计划 */
+    @PostMapping("/import")
+    public Result<Map<String, Object>> importPlans(@RequestBody List<PlanImportItemDTO> items) {
+        return Result.ok(planService.importPlans(items));
     }
 
     @PutMapping("/{id}")
