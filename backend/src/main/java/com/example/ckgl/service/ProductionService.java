@@ -48,6 +48,8 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -437,11 +439,11 @@ public class ProductionService {
     }
 
     /**
-     * 定时出库（按生产计划顺序逐条产线推进）：
-     * 每次只推进计划顺序中最靠前、仍有未完成计划的那一条产线，
-     * 该线的未完成计划各完成 intervalQty 个（封顶计划数量，做完自动切到下一条产线），
+     * 定时出库（各产线并行推进）：
+     * 每一轮每条产线各推进一条计划——即该线计划顺序中最靠前的未完成计划，
+     * 该计划完成 intervalQty 个（封顶计划数量，做完下一轮自动顺延到下一条计划），
      * 零件按 BOM 用量折算合并出库，完成后检查库存预警。
-     * 返回 {plans: 推进计划数, line: 本次推进的产线, outKinds: 出库零件种类数, alerts: 预警消息}
+     * 返回 {plans: 推进计划数, line: 本轮推进的产线, outKinds: 出库零件种类数, alerts: 预警消息}
      */
     @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> autoOut() {
@@ -454,35 +456,42 @@ public class ProductionService {
                         .orderByAsc(ProductionPlan::getId));
         Map<Long, Integer> partOut = new HashMap<>();
         int progressed = 0;
-        String currentLine = null;
-        // 按计划顺序定位第一条还有未完成计划的产线
+        Set<String> advancedLines = new LinkedHashSet<>();
+        // 按产线分组，组内保持计划顺序
+        Map<String, List<ProductionPlan>> byLine = new LinkedHashMap<>();
         for (ProductionPlan p : plans) {
-            int done = p.getCompleted() == null ? 0 : p.getCompleted();
-            if (p.getQuantity() != null && done < p.getQuantity()) {
-                currentLine = p.getLine();
-                break;
+            if (p.getLine() == null || p.getLine().isBlank()) {
+                continue;
             }
+            byLine.computeIfAbsent(p.getLine(), k -> new ArrayList<>()).add(p);
         }
-        if (currentLine != null) {
-            // 只推进这一条产线，其他产线本周期不动
-            for (ProductionPlan plan : plans) {
-                if (!java.util.Objects.equals(plan.getLine(), currentLine)) {
-                    continue;
+        // 每条产线各自推进一条计划（该线最靠前的未完成计划），多条产线同时进行
+        for (Map.Entry<String, List<ProductionPlan>> entry : byLine.entrySet()) {
+            ProductionPlan plan = null;
+            for (ProductionPlan p : entry.getValue()) {
+                int done = p.getCompleted() == null ? 0 : p.getCompleted();
+                if (p.getQuantity() != null && done < p.getQuantity()) {
+                    plan = p;
+                    break;
                 }
-                int done = plan.getCompleted() == null ? 0 : plan.getCompleted();
-                int progress = Math.min(cfg.getIntervalQty(), plan.getQuantity() - done);
-                if (progress <= 0) {
-                    continue;
-                }
-                // 本周期完成量累加到计划（封顶计划数量）
-                plan.setCompleted(done + progress);
-                plan.setUpdatedAt(java.time.LocalDateTime.now());
-                productionPlanMapper.updateById(plan);
-                progressed++;
-                // 按 BOM 用量折算零件消耗（跨计划合并）
-                for (ProductPartDetail pp : productPartMapper.selectByProductId(plan.getProductId())) {
-                    partOut.merge(pp.getPartId(), pp.getQuantity() * progress, Integer::sum);
-                }
+            }
+            if (plan == null) {
+                continue;
+            }
+            int done = plan.getCompleted() == null ? 0 : plan.getCompleted();
+            int progress = Math.min(cfg.getIntervalQty(), plan.getQuantity() - done);
+            if (progress <= 0) {
+                continue;
+            }
+            // 本轮完成量累加到计划（封顶计划数量）
+            plan.setCompleted(done + progress);
+            plan.setUpdatedAt(java.time.LocalDateTime.now());
+            productionPlanMapper.updateById(plan);
+            progressed++;
+            advancedLines.add(entry.getKey());
+            // 按 BOM 用量折算零件消耗（跨计划合并）
+            for (ProductPartDetail pp : productPartMapper.selectByProductId(plan.getProductId())) {
+                partOut.merge(pp.getPartId(), pp.getQuantity() * progress, Integer::sum);
             }
         }
         for (Map.Entry<Long, Integer> entry : partOut.entrySet()) {
@@ -496,7 +505,7 @@ public class ProductionService {
         List<String> alerts = checkAndAlert(cfg);
         Map<String, Object> result = new HashMap<>();
         result.put("plans", progressed);
-        result.put("line", currentLine == null ? "" : currentLine);
+        result.put("line", String.join("、", advancedLines));
         result.put("outKinds", partOut.size());
         result.put("alerts", alerts);
         return result;
