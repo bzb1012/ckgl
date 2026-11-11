@@ -8,6 +8,7 @@ import com.example.ckgl.common.BusinessException;
 import com.example.ckgl.dto.ProductDTO;
 import com.example.ckgl.dto.ProductDetailVO;
 import com.example.ckgl.dto.ProductPartDetail;
+import com.example.ckgl.dto.ProductPartExportVO;
 import com.example.ckgl.dto.ProductPartItem;
 import com.example.ckgl.entity.Product;
 import com.example.ckgl.entity.ProductPart;
@@ -19,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -57,6 +59,32 @@ public class ProductService extends ServiceImpl<ProductMapper, Product> {
             countMap.put(((Number) row.get("productId")).longValue(), ((Number) row.get("cnt")).longValue());
         }
         records.forEach(p -> p.setPartCount(countMap.getOrDefault(p.getId(), 0L).intValue()));
+    }
+
+    /** 导出全部产品及其所需零件；无零件的产品也保留一行（零件字段为空） */
+    public List<ProductPartExportVO> exportParts() {
+        List<Product> products = this.list(new LambdaQueryWrapper<Product>().orderByAsc(Product::getCode));
+        Map<Long, List<ProductPartExportVO>> grouped = new HashMap<>();
+        for (ProductPartExportVO row : productPartMapper.selectAllWithPart()) {
+            grouped.computeIfAbsent(row.getProductId(), k -> new ArrayList<>()).add(row);
+        }
+        List<ProductPartExportVO> result = new ArrayList<>();
+        for (Product product : products) {
+            List<ProductPartExportVO> parts = grouped.get(product.getId());
+            if (parts == null || parts.isEmpty()) {
+                ProductPartExportVO vo = new ProductPartExportVO();
+                vo.setProductCode(product.getCode());
+                vo.setProductName(product.getName());
+                result.add(vo);
+                continue;
+            }
+            for (ProductPartExportVO part : parts) {
+                part.setProductCode(product.getCode());
+                part.setProductName(product.getName());
+                result.add(part);
+            }
+        }
+        return result;
     }
 
     public ProductDetailVO detail(Long id) {

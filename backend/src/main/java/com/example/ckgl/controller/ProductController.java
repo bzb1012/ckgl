@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.ckgl.common.Result;
 import com.example.ckgl.dto.ProductDTO;
 import com.example.ckgl.dto.ProductDetailVO;
+import com.example.ckgl.dto.ProductPartExportVO;
 import com.example.ckgl.entity.Product;
 import com.example.ckgl.service.ProductService;
 import jakarta.validation.Valid;
@@ -18,6 +19,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/products")
 public class ProductController {
@@ -30,6 +33,12 @@ public class ProductController {
                                       @RequestParam(defaultValue = "1") long page,
                                       @RequestParam(defaultValue = "10") long size) {
         return Result.ok(productService.page(keyword, page, size));
+    }
+
+    /** 导出全部产品型号及其所需零件 */
+    @GetMapping("/export")
+    public Result<List<ProductPartExportVO>> exportParts() {
+        return Result.ok(productService.exportParts());
     }
 
     @GetMapping("/{id}")

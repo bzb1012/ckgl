@@ -48,7 +48,8 @@ const messages = {
       usage: '使用数量', remove: '移除',
       pickerTitle: '选择零件', pickFirst: '请先勾选零件',
       partsTitle: '零件清单 - {name}', partsEmpty: '该产品暂未绑定零件',
-      codeRequired: '请输入产品编码', nameRequired: '请输入产品名称'
+      codeRequired: '请输入产品编码', nameRequired: '请输入产品名称',
+      export: '导出', exportFile: '产品零件清单', exportEmpty: '暂无产品数据可导出', uncategorized: '未分类'
     },
     warehouses: {
       add: '新增仓库', code: '仓库编码', name: '仓库名称', locCount: '货位数',
@@ -181,7 +182,8 @@ const messages = {
       usage: 'Usage Qty', remove: 'Remove',
       pickerTitle: 'Select Parts', pickFirst: 'Select parts first',
       partsTitle: 'Parts of {name}', partsEmpty: 'No parts bound to this product',
-      codeRequired: 'Product code is required', nameRequired: 'Product name is required'
+      codeRequired: 'Product code is required', nameRequired: 'Product name is required',
+      export: 'Export', exportFile: 'Product Parts', exportEmpty: 'No product data to export', uncategorized: 'Uncategorized'
     },
     warehouses: {
       add: 'Add Warehouse', code: 'Warehouse Code', name: 'Warehouse Name', locCount: 'Locations',

@@ -4,6 +4,7 @@
       <el-input v-model="query.keyword" :placeholder="t('products.searchPh')" clearable style="width: 240px" @keyup.enter="handleSearch" @clear="handleSearch" />
       <el-button type="primary" @click="handleSearch">{{ t('common.search') }}</el-button>
       <div class="spacer"></div>
+      <el-button :loading="exporting" @click="handleExport">{{ t('products.export') }}</el-button>
       <el-button type="success" @click="openCreate">{{ t('products.add') }}</el-button>
     </div>
 
@@ -123,6 +124,7 @@ const { isMobile } = useResponsive()
 
 const loading = ref(false)
 const saving = ref(false)
+const exporting = ref(false)
 const list = ref([])
 const total = ref(0)
 const query = reactive({ keyword: '', page: 1, size: 10 })
@@ -269,6 +271,44 @@ const handleDelete = async row => {
   await productApi.remove(row.id)
   ElMessage.success(t('common.deleteOk'))
   fetch()
+}
+
+/** 导出产品零件矩阵：一行一个产品，一列一个零件类别，单元格为该类别下的零件编码（不含数量） */
+const handleExport = async () => {
+  exporting.value = true
+  try {
+    const rows = await productApi.exportAll()
+    if (!rows.length) {
+      ElMessage.warning(t('products.exportEmpty'))
+      return
+    }
+    const uncategorized = t('products.uncategorized')
+    const categories = [...new Set(rows.map(r => r.category || uncategorized))].sort((a, b) => a.localeCompare(b))
+    // 按产品分组（保持后端的产品编码顺序），同类别多个零件用顿号连接
+    const products = new Map()
+    for (const r of rows) {
+      const key = r.productId ?? `${r.productCode}|${r.productName}`
+      if (!products.has(key)) {
+        products.set(key, { code: r.productCode || '', name: r.productName || '', cells: {} })
+      }
+      if (!r.partCode) continue
+      const cell = products.get(key).cells
+      const cat = r.category || uncategorized
+      cell[cat] = cell[cat] ? `${cell[cat]}、${r.partCode}` : r.partCode
+    }
+    const XLSX = await import('xlsx')
+    const head = [t('products.code'), t('products.name'), ...categories]
+    const body = [...products.values()].map(p => [p.code, p.name, ...categories.map(c => p.cells[c] || '')])
+    const ws = XLSX.utils.aoa_to_sheet([head, ...body])
+    ws['!cols'] = head.map((_, i) => ({ wch: i < 2 ? 24 : 22 }))
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, t('products.exportFile').slice(0, 31))
+    const now = new Date()
+    const day = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+    XLSX.writeFile(wb, `${t('products.exportFile')}-${day}.xlsx`)
+  } finally {
+    exporting.value = false
+  }
 }
 
 onMounted(fetch)
